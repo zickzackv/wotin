@@ -24,3 +24,6 @@ Thumbs.db
 
 # Odin specific
 ols.json
+
+# test data
+test_frames.json
