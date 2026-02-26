@@ -1,136 +1,75 @@
-# wotin
+# Wotin - Work Time Tracker
 
-**wotin** - A time tracking tool written in Odin, inspired by [Watson](https://github.com/TailorDev/Watson).
+A simple command-line time tracking tool written in Odin with SQLite backend.
 
-## About
+## Features
 
-wotin is a command-line time tracking application built with the [Odin programming language](https://odin-lang.org/). It's designed to help you track time spent on projects and tasks with a simple, efficient interface.
-
-## Features (Planned)
-
-- ⏱️ Start/stop time tracking for projects
-- 🏷️ Tag entries for better organization
-- 📊 Generate reports and statistics
-- 💾 Local data storage (JSON-based)
-- 🔄 Import/export functionality
-- 🎯 Simple, intuitive CLI
-
-## Prerequisites
-
-To build and run wotin, you'll need:
-
-- [Odin compiler](https://odin-lang.org/docs/install/) (latest stable version recommended)
-- Git (for cloning the repository)
-
-### Installing Odin
-
-**Windows:**
-1. Install Visual Studio Build Tools with C++ support
-2. Clone the Odin repository: `git clone https://github.com/odin-lang/Odin`
-3. Build Odin: `cd Odin && build.bat release`
-4. Add Odin to your PATH
-
-**Linux/macOS:**
-1. Install LLVM/Clang
-2. Clone the Odin repository: `git clone https://github.com/odin-lang/Odin`
-3. Build Odin: `cd Odin && make release-native`
-4. Add Odin to your PATH
-
-For detailed installation instructions, see the [official Odin installation guide](https://odin-lang.org/docs/install/).
+- Track work time with start/stop commands
+- Organize work by projects
+- Tag entries for better categorization
+- SQLite database storage at `~/.wotin/timetracking.db`
+- Normalized database schema for efficient querying
 
 ## Building
 
-### Linux/macOS
-
 ```bash
-# Debug build
-./build.sh
-
-# Release build
-./build.sh release
-```
-
-### Windows
-
-```cmd
-REM Debug build
-build.bat
-
-REM Release build
-build.bat release
-```
-
-Or build directly with Odin:
-
-```bash
-# Debug build
-odin build src -out:build/wotin -debug
-
-# Release build
-odin build src -out:build/wotin -o:speed
+nix develop
+cd src
+odin build . -out:../timer
 ```
 
 ## Usage
 
+### Start tracking time
+
 ```bash
-# Run the built binary
-./build/wotin
+# Start tracking for a project
+timer start myproject
+
+# Start tracking with tags
+timer start myproject --tags backend,urgent,client-a
 ```
 
-## Project Structure
+### Stop tracking time
 
-```
-wotin/
-├── src/
-│   ├── main.odin      # Main entry point
-│   ├── config.odin    # Configuration handling
-│   └── types.odin     # Core data structures
-├── build/             # Build output directory (gitignored)
-├── build.sh           # Linux/macOS build script
-├── build.bat          # Windows build script
-├── .gitignore
-└── README.md
+```bash
+timer stop
 ```
 
-## Development Roadmap
+## Database Schema
 
-### Phase 1: Core Functionality
-- [ ] Basic CLI structure
-- [ ] Start/stop time tracking
-- [ ] Project and tag management
-- [ ] Local data persistence (JSON)
+The application uses a normalized SQLite schema with the following tables:
 
-### Phase 2: Reporting
-- [ ] Daily/weekly/monthly reports
-- [ ] Time statistics per project
-- [ ] Export to various formats
+- `projects` - Project definitions
+- `tags` - Tag definitions
+- `time_entries` - Time tracking entries with start/stop times
+- `time_entry_tags` - Many-to-many relationship between entries and tags
 
-### Phase 3: Advanced Features
-- [ ] Edit existing entries
-- [ ] Delete entries
-- [ ] Search and filter functionality
-- [ ] Configuration file support
+See `schema.sql` for the complete schema definition.
 
-## Inspiration
+## Querying Data
 
-This project is inspired by:
-- [Watson](https://github.com/TailorDev/Watson) - Simple time tracking CLI
-- The Odin philosophy of simplicity and performance
+You can query the database directly with sqlite3:
 
-## Contributing
+```bash
+# View all time entries with project names
+sqlite3 ~/.wotin/timetracking.db "
+  SELECT te.id, p.name, te.start_time, te.stop_time 
+  FROM time_entries te 
+  JOIN projects p ON te.project_id = p.id;
+"
 
-Contributions are welcome! This is a learning project, so feel free to:
-- Report bugs
-- Suggest features
-- Submit pull requests
-- Improve documentation
+# View entries with their tags
+sqlite3 ~/.wotin/timetracking.db "
+  SELECT te.id, p.name, GROUP_CONCAT(t.name, ', ') as tags
+  FROM time_entries te
+  JOIN projects p ON te.project_id = p.id
+  LEFT JOIN time_entry_tags tet ON te.id = tet.time_entry_id
+  LEFT JOIN tags t ON tet.tag_id = t.id
+  GROUP BY te.id;
+"
+```
 
-## License
+## Future Backends
 
-TBD
-
-## Resources
-
-- [Odin Official Documentation](https://odin-lang.org/docs/)
-- [Odin GitHub Repository](https://github.com/odin-lang/Odin)
-- [Watson Documentation](https://tailordev.github.io/Watson/)
+The architecture is designed to support multiple storage backends. A KDL (document-oriented) backend is planned for future implementation.
