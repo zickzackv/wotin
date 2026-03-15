@@ -745,3 +745,110 @@ remove_entry_by_frame_id :: proc(frame_id: string) -> bool {
 	}
 	return sqlite3_changes(db) > 0
 }
+
+// Change the project and/or tags of an entry identified by frame_id.
+// Pass empty string for project to keep existing. Pass nil for tags to keep existing.
+change_entry :: proc(frame_id: string, new_project: string, new_tags: []string, has_tags: bool) -> bool {
+	// Resolve entry id
+	id_query := "SELECT id FROM time_entries WHERE frame_id = ?"
+	id_query_cstr := strings.clone_to_cstring(id_query, context.temp_allocator)
+	id_stmt: ^Sqlite3_Stmt
+	if sqlite3_prepare_v2(db, id_query_cstr, -1, &id_stmt, nil) != SQLITE_OK {
+		return false
+	}
+	defer sqlite3_finalize(id_stmt)
+	fid_cstr := strings.clone_to_cstring(frame_id, context.temp_allocator)
+	sqlite3_bind_text(id_stmt, 1, fid_cstr, -1, nil)
+	if sqlite3_step(id_stmt) != SQLITE_ROW {
+		return false
+	}
+	entry_id := sqlite3_column_int64(id_stmt, 0)
+
+	// Update project if provided
+	if len(new_project) > 0 {
+		proj_id, ok := get_or_create_project(new_project)
+		if !ok {
+			return false
+		}
+		upd := "UPDATE time_entries SET project_id = ? WHERE id = ?"
+		upd_cstr := strings.clone_to_cstring(upd, context.temp_allocator)
+		upd_stmt: ^Sqlite3_Stmt
+		if sqlite3_prepare_v2(db, upd_cstr, -1, &upd_stmt, nil) != SQLITE_OK {
+			return false
+		}
+		defer sqlite3_finalize(upd_stmt)
+		sqlite3_bind_int64(upd_stmt, 1, proj_id)
+		sqlite3_bind_int64(upd_stmt, 2, entry_id)
+		if sqlite3_step(upd_stmt) != SQLITE_DONE {
+			return false
+		}
+	}
+
+	// Replace tags if provided
+	if has_tags {
+		del := "DELETE FROM time_entry_tags WHERE time_entry_id = ?"
+		del_cstr := strings.clone_to_cstring(del, context.temp_allocator)
+		del_stmt: ^Sqlite3_Stmt
+		if sqlite3_prepare_v2(db, del_cstr, -1, &del_stmt, nil) != SQLITE_OK {
+			return false
+		}
+		defer sqlite3_finalize(del_stmt)
+		sqlite3_bind_int64(del_stmt, 1, entry_id)
+		sqlite3_step(del_stmt)
+
+		for tag in new_tags {
+			tag_id, tag_ok := get_or_create_tag(tag)
+			if !tag_ok do continue
+			ins := "INSERT OR IGNORE INTO time_entry_tags (time_entry_id, tag_id) VALUES (?, ?)"
+			ins_cstr := strings.clone_to_cstring(ins, context.temp_allocator)
+			ins_stmt: ^Sqlite3_Stmt
+			if sqlite3_prepare_v2(db, ins_cstr, -1, &ins_stmt, nil) == SQLITE_OK {
+				sqlite3_bind_int64(ins_stmt, 1, entry_id)
+				sqlite3_bind_int64(ins_stmt, 2, tag_id)
+				sqlite3_step(ins_stmt)
+				sqlite3_finalize(ins_stmt)
+			}
+		}
+	}
+
+	return true
+}
+
+// DailyAggregate holds total seconds per project for one day
+DailyAggregate :: struct {
+	date:    string,
+	project: string,
+	seconds: i64,
+}
+
+// Get daily aggregated time per project
+get_aggregate_data :: proc(allocator := context.allocator) -> [dynamic]DailyAggregate {
+	results := make([dynamic]DailyAggregate, allocator)
+
+	query := `
+		SELECT date(te.start_time) as day, p.name,
+		       CAST(SUM((julianday(COALESCE(te.stop_time, strftime('%Y-%m-%d %H:%M:%S','now'))) - julianday(te.start_time)) * 86400) AS INTEGER)
+		FROM time_entries te
+		JOIN projects p ON te.project_id = p.id
+		GROUP BY day, p.id
+		ORDER BY day DESC, p.name
+	`
+	query_cstr := strings.clone_to_cstring(query, context.temp_allocator)
+	stmt: ^Sqlite3_Stmt
+	if sqlite3_prepare_v2(db, query_cstr, -1, &stmt, nil) != SQLITE_OK {
+		return results
+	}
+	defer sqlite3_finalize(stmt)
+
+	for sqlite3_step(stmt) == SQLITE_ROW {
+		date    := string(cstring(sqlite3_column_text(stmt, 0)))
+		project := string(cstring(sqlite3_column_text(stmt, 1)))
+		secs    := sqlite3_column_int64(stmt, 2)
+		append(&results, DailyAggregate{
+			date    = strings.clone(date, allocator),
+			project = strings.clone(project, allocator),
+			seconds = secs,
+		})
+	}
+	return results
+}

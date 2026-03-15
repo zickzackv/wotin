@@ -160,6 +160,79 @@ main :: proc() {
 			os.exit(1)
 		}
 
+	case "change":
+		// wotin change <frame_id> [--project <name>] [+tag...] [--tags t1,t2]
+		if len(args) < 3 {
+			fmt.eprintln("Error: frame ID required")
+			fmt.eprintln("Usage: wotin change <frame_id> [--project <name>] [+tag...]")
+			os.exit(1)
+		}
+		frame_id := args[2]
+		parsed := parse_watson_args(args[3:])
+		defer free_parsed_args(&parsed)
+
+		new_project := ""
+		if p, ok := parsed.flags["project"]; ok {
+			new_project = p
+		}
+		has_tags := len(parsed.tags) > 0
+		if _, ok := parsed.flags["tags"]; ok {
+			has_tags = true
+		}
+
+		if len(new_project) == 0 && !has_tags {
+			fmt.eprintln("Error: specify --project and/or +tags to change")
+			os.exit(1)
+		}
+
+		if change_entry(frame_id, new_project, parsed.tags[:], has_tags) {
+			fmt.printf("Updated frame %s\n", frame_id)
+		} else {
+			fmt.fprintf(os.stderr, "Error: frame '%s' not found\n", frame_id)
+			os.exit(1)
+		}
+
+	case "aggregate":
+		parsed := parse_watson_args(args[2:])
+		defer free_parsed_args(&parsed)
+
+		rows := get_aggregate_data()
+		defer {
+			for r in rows {
+				delete(r.date)
+				delete(r.project)
+			}
+			delete(rows)
+		}
+
+		if _, has_json := parsed.flags["json"]; has_json {
+			fmt.print("[")
+			for r, i in rows {
+				if i > 0 do fmt.print(",")
+				fmt.printf("{\"date\":\"%s\",\"project\":\"%s\",\"seconds\":%d}", r.date, r.project, r.seconds)
+			}
+			fmt.println("]")
+		} else {
+			current_date := ""
+			day_total: i64 = 0
+			for r in rows {
+				if r.date != current_date {
+					if current_date != "" {
+						fmt.printf("  %-44s %s\n", "Total", format_duration(day_total))
+						fmt.println()
+					}
+					fmt.printf("%s\n", r.date)
+					current_date = r.date
+					day_total = 0
+				}
+				fmt.printf("  %-44s %s\n", r.project, format_duration(r.seconds))
+				day_total += r.seconds
+			}
+			if current_date != "" {
+				fmt.printf("  %-44s %s\n", "Total", format_duration(day_total))
+			}
+		}
+
 	case "projects":
 		projects := list_projects()
 		defer {
@@ -499,12 +572,15 @@ Tracking:
 Viewing:
   log [--json]                              List activities grouped by date
   report [--json]                           Aggregated time by project and tags
+  aggregate [--json]                        Daily time breakdown per project
   frames                                    List all frame IDs
   projects                                  List all projects with total time
   tags                                      List all tags with usage count
 
 Management:
   remove <frame_id>                         Delete an entry by frame ID
+  change <frame_id> [--project <n>]         Change project and/or tags of an entry
+    [+tag...] [--tags tag1,tag2]
   add <project> --from <t> --to <t>         Manually add a past activity
     [+tag...] [--tags tag1,tag2]
 
@@ -513,8 +589,10 @@ Examples:
   wotin stop
   wotin restart
   wotin log
+  wotin aggregate
   wotin report --json
   wotin remove abc1234
+  wotin change abc1234 --project newproject +newtag
 `)
 }
 

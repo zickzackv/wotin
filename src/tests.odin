@@ -105,3 +105,30 @@ test_format_duration_minutes_only :: proc(t: ^testing.T) {
 	result := format_duration(90) // 1m 30s
 	testing.expect_value(t, result, "0h 01m")
 }
+
+// --- parse_watson_args edge cases for change command ---
+
+@(test)
+test_parse_project_flag :: proc(t: ^testing.T) {
+	args := []string{"--project", "newname", "+newtag"}
+	parsed := parse_watson_args(args)
+	defer free_parsed_args(&parsed)
+
+	proj, ok := parsed.flags["project"]
+	testing.expect(t, ok, "expected --project flag")
+	testing.expect_value(t, proj, "newname")
+	testing.expect_value(t, len(parsed.tags), 1)
+	testing.expect_value(t, parsed.tags[0], "newtag")
+}
+
+@(test)
+test_parse_no_args_no_crash :: proc(t: ^testing.T) {
+	args := []string{"--json"}
+	parsed := parse_watson_args(args)
+	defer free_parsed_args(&parsed)
+
+	testing.expect_value(t, len(parsed.positional), 0)
+	testing.expect_value(t, len(parsed.tags), 0)
+	_, ok := parsed.flags["json"]
+	testing.expect(t, ok, "expected --json flag")
+}
