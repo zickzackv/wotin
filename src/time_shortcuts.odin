@@ -108,9 +108,72 @@ resolve_time_range :: proc(flags: map[string]string) -> (range: TimeRange, ok: b
 	return TimeRange{from = seven_days_ago, to = now}, true
 }
 
-// Format time range for display
-format_time_range :: proc(range: TimeRange) -> string {
-	from_str := fmt.tprintf("%v", range.from)
-	to_str := fmt.tprintf("%v", range.to)
-	return fmt.tprintf("%s to %s", from_str, to_str)
+// Resolve time shortcuts to SQL datetime strings (UTC, matching SQLite storage format)
+// Returns ("", "") if no filter flags present — meaning "all time"
+resolve_time_range_sql :: proc(flags: map[string]string) -> (from_sql: string, to_sql: string) {
+	now := time.now()
+	year, month, day := time.date(now)
+	hour, min, sec := time.clock(now)
+
+	// Helper: format as "YYYY-MM-DD HH:MM:SS"
+	fmt_dt :: proc(y, mo, d, h, mi, s: int) -> string {
+		return fmt.tprintf("%04d-%02d-%02d %02d:%02d:%02d", y, mo, d, h, mi, s)
+	}
+
+	if _, ok := flags["today"]; ok {
+		return fmt_dt(year, int(month), day, 0, 0, 0),
+		       fmt_dt(year, int(month), day, 23, 59, 59)
+	}
+
+	if _, ok := flags["yesterday"]; ok {
+		DAY :: 24 * time.Hour
+		yest := time.Time{_nsec = now._nsec - i64(DAY)}
+		yy, ym, yd := time.date(yest)
+		return fmt_dt(yy, int(ym), yd, 0, 0, 0),
+		       fmt_dt(yy, int(ym), yd, 23, 59, 59)
+	}
+
+	if _, ok := flags["week"]; ok {
+		weekday := int(time.weekday(now))
+		days_since_monday := (weekday + 6) % 7
+		DAY :: 24 * time.Hour
+		mon := time.Time{_nsec = now._nsec - i64(time.Duration(days_since_monday)*DAY)}
+		my, mm, md := time.date(mon)
+		sun := time.Time{_nsec = mon._nsec + i64(6*DAY)}
+		sy, sm, sd := time.date(sun)
+		return fmt_dt(my, int(mm), md, 0, 0, 0),
+		       fmt_dt(sy, int(sm), sd, 23, 59, 59)
+	}
+
+	if _, ok := flags["month"]; ok {
+		next_month := int(month) + 1
+		next_year := year
+		if next_month > 12 { next_month = 1; next_year += 1 }
+		return fmt_dt(year, int(month), 1, 0, 0, 0),
+		       fmt_dt(next_year, next_month, 1, 0, 0, -1) // SQLite: day 1 00:00:00 of next month exclusive
+	}
+
+	if _, ok := flags["year"]; ok {
+		return fmt_dt(year, 1, 1, 0, 0, 0),
+		       fmt_dt(year, 12, 31, 23, 59, 59)
+	}
+
+	// Explicit --from / --to
+	from_str, has_from := flags["from"]
+	to_str, has_to   := flags["to"]
+	if has_from && has_to {
+		from_parsed, from_ok := parse_datetime(from_str)
+		to_parsed,   to_ok   := parse_datetime(to_str)
+		if from_ok && to_ok {
+			return from_parsed, to_parsed
+		}
+	}
+	if has_from {
+		from_parsed, from_ok := parse_datetime(from_str)
+		if from_ok {
+			return from_parsed, fmt_dt(year, int(month), day, hour, min, sec)
+		}
+	}
+
+	return "", ""
 }
