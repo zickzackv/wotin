@@ -291,12 +291,8 @@ unix_to_sqlite :: proc(unix: i64) -> string {
 
 // Convert ISO8601 "2025-10-31T12:15:46Z" to "2025-10-31 12:15:46"
 iso8601_to_sqlite :: proc(s: string) -> string {
-	if len(s) < 19 do return s
-	// Replace T with space, strip trailing Z/timezone
-	b := strings.clone(s[:19])
-	if b[10] == 'T' {
-		bs := transmute([]byte)b
-		bs[10] = ' '
-	}
-	return b
+	t, _ := time.iso8601_to_time_utc(s)
+	y, m, d := time.date(t)
+	h, mi, sec := time.clock(t)
+	return fmt.aprintf("%04d-%02d-%02d %02d:%02d:%02d", y, int(m), d, h, mi, sec)
 }
