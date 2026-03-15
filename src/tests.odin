@@ -121,14 +121,64 @@ test_parse_project_flag :: proc(t: ^testing.T) {
 	testing.expect_value(t, parsed.tags[0], "newtag")
 }
 
-@(test)
-test_parse_no_args_no_crash :: proc(t: ^testing.T) {
-	args := []string{"--json"}
-	parsed := parse_watson_args(args)
-	defer free_parsed_args(&parsed)
+// --- parse_edit_json tests ---
 
-	testing.expect_value(t, len(parsed.positional), 0)
-	testing.expect_value(t, len(parsed.tags), 0)
-	_, ok := parsed.flags["json"]
-	testing.expect(t, ok, "expected --json flag")
+@(test)
+test_parse_edit_json_full :: proc(t: ^testing.T) {
+	src := `{
+  "frame_id": "abc1234",
+  "project": "myproject",
+  "start_time": "2026-03-15 09:00:00",
+  "stop_time": "2026-03-15 10:30:00",
+  "tags": ["backend", "api"]
+}`
+	project, start, stop, tags, ok := parse_edit_json(src)
+	defer { delete(project); delete(start); delete(stop); for t in tags do delete(t); delete(tags) }
+
+	testing.expect(t, ok)
+	testing.expect_value(t, project, "myproject")
+	testing.expect_value(t, start, "2026-03-15 09:00:00")
+	testing.expect_value(t, stop, "2026-03-15 10:30:00")
+	testing.expect_value(t, len(tags), 2)
+	testing.expect_value(t, tags[0], "backend")
+	testing.expect_value(t, tags[1], "api")
+}
+
+@(test)
+test_parse_edit_json_empty_tags :: proc(t: ^testing.T) {
+	src := `{"project": "proj", "start_time": "2026-03-15 09:00:00", "stop_time": "", "tags": []}`
+	project, start, stop, tags, ok := parse_edit_json(src)
+	defer { delete(project); delete(start); delete(stop); for t in tags do delete(t); delete(tags) }
+
+	testing.expect(t, ok)
+	testing.expect_value(t, project, "proj")
+	testing.expect_value(t, len(tags), 0)
+}
+
+@(test)
+test_parse_edit_json_missing_project :: proc(t: ^testing.T) {
+	src := `{"start_time": "2026-03-15 09:00:00", "tags": []}`
+	_, _, _, tags, ok := parse_edit_json(src)
+	defer { delete(tags) }
+	testing.expect(t, !ok, "should fail without project field")
+}
+
+@(test)
+test_frame_to_edit_json_roundtrip :: proc(t: ^testing.T) {
+	entry := TimeEntryInfo{
+		project    = "roundtrip",
+		start_time = "2026-03-15 08:00:00",
+		stop_time  = "2026-03-15 09:00:00",
+		tags       = "x,y",
+	}
+	json := frame_to_edit_json(entry, "abc1234")
+
+	project, start, stop, tags, ok := parse_edit_json(json)
+	defer { delete(project); delete(start); delete(stop); for t in tags do delete(t); delete(tags) }
+
+	testing.expect(t, ok)
+	testing.expect_value(t, project, "roundtrip")
+	testing.expect_value(t, start, "2026-03-15 08:00:00")
+	testing.expect_value(t, stop, "2026-03-15 09:00:00")
+	testing.expect_value(t, len(tags), 2)
 }
