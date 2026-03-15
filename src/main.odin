@@ -226,6 +226,35 @@ main :: proc() {
 		}
 		format_tags(tags)
 
+
+	case "rename":
+		// wotin rename project <old> <new>
+		// wotin rename tag <old> <new>
+		if len(args) < 5 {
+			fmt.eprintln("Usage: wotin rename project|tag <old-name> <new-name>")
+			os.exit(1)
+		}
+		kind, old_name, new_name := args[2], args[3], args[4]
+		switch kind {
+		case "project":
+			if rename_project(old_name, new_name) {
+				fmt.printf("Renamed project '%s' -> '%s'\n", old_name, new_name)
+			} else {
+				fmt.fprintf(os.stderr, "Error: project '%s' not found\n", old_name)
+				os.exit(1)
+			}
+		case "tag":
+			if rename_tag(old_name, new_name) {
+				fmt.printf("Renamed tag '%s' -> '%s'\n", old_name, new_name)
+			} else {
+				fmt.fprintf(os.stderr, "Error: tag '%s' not found\n", old_name)
+				os.exit(1)
+			}
+		case:
+			fmt.fprintf(os.stderr, "Error: unknown type '%s', use 'project' or 'tag'\n", kind)
+			os.exit(1)
+		}
+
 	case "help", "--help", "-h":
 		print_help()
 		

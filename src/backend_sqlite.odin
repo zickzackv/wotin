@@ -704,6 +704,43 @@ get_report_data :: proc(from_sql: string = "", to_sql: string = "", allocator :=
 	return results
 }
 
+
+// Rename a project or tag across all entries
+rename_project :: proc(old_name: string, new_name: string) -> bool {
+	upd := "UPDATE projects SET name = ? WHERE name = ?"
+	upd_cstr := strings.clone_to_cstring(upd, context.temp_allocator)
+	stmt: ^Sqlite3_Stmt
+	if sqlite3_prepare_v2(db, upd_cstr, -1, &stmt, nil) != SQLITE_OK {
+		return false
+	}
+	defer sqlite3_finalize(stmt)
+	new_cstr := strings.clone_to_cstring(new_name, context.temp_allocator)
+	old_cstr := strings.clone_to_cstring(old_name, context.temp_allocator)
+	sqlite3_bind_text(stmt, 1, new_cstr, -1, nil)
+	sqlite3_bind_text(stmt, 2, old_cstr, -1, nil)
+	if sqlite3_step(stmt) != SQLITE_DONE {
+		return false
+	}
+	return sqlite3_changes(db) > 0
+}
+
+rename_tag :: proc(old_name: string, new_name: string) -> bool {
+	upd := "UPDATE tags SET name = ? WHERE name = ?"
+	upd_cstr := strings.clone_to_cstring(upd, context.temp_allocator)
+	stmt: ^Sqlite3_Stmt
+	if sqlite3_prepare_v2(db, upd_cstr, -1, &stmt, nil) != SQLITE_OK {
+		return false
+	}
+	defer sqlite3_finalize(stmt)
+	new_cstr := strings.clone_to_cstring(new_name, context.temp_allocator)
+	old_cstr := strings.clone_to_cstring(old_name, context.temp_allocator)
+	sqlite3_bind_text(stmt, 1, new_cstr, -1, nil)
+	sqlite3_bind_text(stmt, 2, old_cstr, -1, nil)
+	if sqlite3_step(stmt) != SQLITE_DONE {
+		return false
+	}
+	return sqlite3_changes(db) > 0
+}
 format_duration :: proc(seconds: i64) -> string {
 	hours := seconds / 3600
 	mins := (seconds % 3600) / 60
