@@ -8,6 +8,9 @@ import "core:strings"
 db: ^Sqlite3
 
 get_db_path :: proc() -> string {
+	if env_path := os.get_env("WOTIN_DB"); len(env_path) > 0 {
+		return env_path
+	}
 	config_dir := get_config_dir()
 	return filepath.join({config_dir, "timetracking.db"})
 }

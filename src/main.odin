@@ -5,19 +5,26 @@ import "core:os"
 import "core:strings"
 
 main :: proc() {
+	args := os.args[1:]
+
+	// Strip global --db <path> flag before subcommand dispatch
+	if len(args) >= 2 && args[0] == "--db" {
+		os.set_env("WOTIN_DB", args[1])
+		args = args[2:]
+	}
+
 	if !init_database() {
 		fmt.eprintln("Failed to initialize database")
 		os.exit(1)
 	}
 	defer close_database()
 
-	args := os.args
-	if len(args) < 2 {
+	if len(args) < 1 {
 		print_help()
 		return
 	}
 
-	switch args[1] {
+	switch args[0] {
 	case "status", "current":
 		entry, frame_id, ok := get_current_entry()
 		if !ok {
@@ -94,12 +101,12 @@ main :: proc() {
 		}
 
 	case "remove":
-		if len(args) < 3 {
+		if len(args) < 2 {
 			fmt.eprintln("Error: frame ID required")
 			fmt.eprintln("Usage: wotin remove <frame_id>")
 			os.exit(1)
 		}
-		frame_id := args[2]
+		frame_id := args[1]
 		if remove_entry_by_frame_id(frame_id) {
 			fmt.printf("Removed frame %s\n", frame_id)
 		} else {
@@ -109,13 +116,13 @@ main :: proc() {
 
 	case "change":
 		// wotin change <frame_id> [--project <name>] [+tag...] [--tags t1,t2]
-		if len(args) < 3 {
+		if len(args) < 2 {
 			fmt.eprintln("Error: frame ID required")
 			fmt.eprintln("Usage: wotin change <frame_id> [--project <name>] [+tag...]")
 			os.exit(1)
 		}
-		frame_id := args[2]
-		parsed := parse_watson_args(args[3:])
+		frame_id := args[1]
+		parsed := parse_watson_args(args[2:])
 		defer free_parsed_args(&parsed)
 
 		new_project := ""
@@ -140,7 +147,7 @@ main :: proc() {
 		}
 
 	case "aggregate":
-		parsed := parse_watson_args(args[2:])
+		parsed := parse_watson_args(args[1:])
 		defer free_parsed_args(&parsed)
 
 		from_sql, to_sql := resolve_time_range_sql(parsed.flags)
@@ -210,11 +217,11 @@ main :: proc() {
 	case "rename":
 		// wotin rename project <old> <new>
 		// wotin rename tag <old> <new>
-		if len(args) < 5 {
+		if len(args) < 4 {
 			fmt.eprintln("Usage: wotin rename project|tag <old-name> <new-name>")
 			os.exit(1)
 		}
-		kind, old_name, new_name := args[2], args[3], args[4]
+		kind, old_name, new_name := args[1], args[2], args[3]
 		switch kind {
 		case "project":
 			if rename_project(old_name, new_name) {
@@ -236,22 +243,22 @@ main :: proc() {
 		}
 
 	case "edit":
-		if len(args) < 3 {
+		if len(args) < 2 {
 			fmt.eprintln("Usage: wotin edit <frame_id>")
 			os.exit(1)
 		}
-		if !edit_frame_in_editor(args[2]) {
+		if !edit_frame_in_editor(args[1]) {
 			os.exit(1)
 		}
-		fmt.printf("Updated frame %s\n", args[2])
+		fmt.printf("Updated frame %s\n", args[1])
 
 	case "import":
-		if len(args) < 3 {
+		if len(args) < 2 {
 			fmt.eprintln("Usage: wotin import <path-to-watson-frames>")
 			fmt.eprintln("Default Watson path: ~/.config/watson/frames")
 			os.exit(1)
 		}
-		path := args[2]
+		path := args[1]
 		imported, skipped, ok := import_watson_frames(path)
 		if !ok {
 			os.exit(1)
@@ -264,14 +271,14 @@ main :: proc() {
 		print_help()
 
 	case "start":
-		if len(args) < 3 {
+		if len(args) < 2 {
 			fmt.println("Error: project name required")
 			fmt.println("Usage: timer start <project> [+tag1 +tag2...] [--at HH:MM]")
 			os.exit(1)
 		}
 
 		// Parse Watson-style arguments
-		parsed := parse_watson_args(args[2:])
+		parsed := parse_watson_args(args[1:])
 		defer free_parsed_args(&parsed)
 
 		if len(parsed.positional) == 0 {
@@ -354,7 +361,7 @@ main :: proc() {
 		}
 
 	case "log":
-		parsed := parse_watson_args(args[2:])
+		parsed := parse_watson_args(args[1:])
 		defer free_parsed_args(&parsed)
 
 		from_sql, to_sql := resolve_time_range_sql(parsed.flags)
@@ -396,7 +403,7 @@ main :: proc() {
 		}
 
 	case "report":
-		parsed := parse_watson_args(args[2:])
+		parsed := parse_watson_args(args[1:])
 		defer free_parsed_args(&parsed)
 
 		from_sql, to_sql := resolve_time_range_sql(parsed.flags)
@@ -443,13 +450,13 @@ main :: proc() {
 		}
 
 	case "list":
-		if len(args) < 3 {
+		if len(args) < 2 {
 			fmt.println("Error: list type required")
 			fmt.println("Usage: timer list <projects|entries|tags>")
 			os.exit(1)
 		}
 
-		switch args[2] {
+		switch args[1] {
 		case "projects":
 			projects := list_projects()
 			defer delete(projects)
@@ -472,13 +479,13 @@ main :: proc() {
 			defer delete(tags)
 			format_tags(tags)
 		case:
-			fmt.printf("Unknown list type: '%s'\n", args[2])
+			fmt.printf("Unknown list type: '%s'\n", args[1])
 			fmt.println("Usage: timer list <projects|entries|tags>")
 			os.exit(1)
 		}
 
 	case "add":
-		if len(args) < 3 {
+		if len(args) < 2 {
 			fmt.println("Error: project name required")
 			fmt.println(
 				"Usage: timer add <project> --from <time> --to <time> [--tags tag1,tag2,...]",
@@ -486,14 +493,14 @@ main :: proc() {
 			os.exit(1)
 		}
 
-		project := args[2]
+		project := args[1]
 		from_time := ""
 		to_time := ""
 		tags: [dynamic]string
 		defer delete(tags)
 
 		// Parse arguments
-		i := 3
+		i := 2
 		for i < len(args) {
 			switch args[i] {
 			case "--from":
@@ -570,7 +577,7 @@ main :: proc() {
 		}
 
 	case:
-		fmt.fprintf(os.stderr, "Unknown command: '%s'\n", args[1])
+		fmt.fprintf(os.stderr, "Unknown command: '%s'\n", args[0])
 		fmt.eprintln("Run 'wotin help' for usage.")
 		os.exit(1)
 	}
