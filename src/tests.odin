@@ -1,7 +1,7 @@
 package main
 
-import "core:testing"
 import "core:strings"
+import "core:testing"
 
 // --- arg_parser tests ---
 
@@ -77,12 +77,18 @@ test_frame_id_uniqueness :: proc(t: ^testing.T) {
 	id2 := generate_frame_id("proj", "2026-03-15 10:00:00")
 	// They may collide in theory but practically won't; just check they're valid hex
 	for ch in id1 {
-		testing.expect(t, (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'),
-			"frame ID must be lowercase hex")
+		testing.expect(
+			t,
+			(ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'),
+			"frame ID must be lowercase hex",
+		)
 	}
 	for ch in id2 {
-		testing.expect(t, (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'),
-			"frame ID must be lowercase hex")
+		testing.expect(
+			t,
+			(ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'),
+			"frame ID must be lowercase hex",
+		)
 	}
 }
 
@@ -143,12 +149,12 @@ test_parse_watson_frame_array_basic :: proc(t: ^testing.T) {
 	// parse_watson_frame_array expects pos to point at the opening [ of the frame
 	src := `["myproject", 1730373346, 1730377200, ["backend", "api"], "abc1234"]`
 	end, project, start, stop, tags, ok := parse_watson_frame_array(src, 0)
-	defer { delete(project); for tag in tags do delete(tag); delete(tags) }
+	defer {delete(project); for tag in tags do delete(tag); delete(tags)}
 
 	testing.expect(t, ok)
 	testing.expect_value(t, project, "myproject")
 	testing.expect_value(t, start, i64(1730373346))
-	testing.expect_value(t, stop,  i64(1730377200))
+	testing.expect_value(t, stop, i64(1730377200))
 	testing.expect_value(t, len(tags), 2)
 	testing.expect_value(t, tags[0], "backend")
 	_ = end
@@ -158,7 +164,7 @@ test_parse_watson_frame_array_basic :: proc(t: ^testing.T) {
 test_parse_watson_frame_array_no_tags :: proc(t: ^testing.T) {
 	src := `["proj", 1730373346, 1730377200, [], "abc"]`
 	_, project, _, _, tags, ok := parse_watson_frame_array(src, 0)
-	defer { delete(project); for tag in tags do delete(tag); delete(tags) }
+	defer {delete(project); for tag in tags do delete(tag); delete(tags)}
 
 	testing.expect(t, ok)
 	testing.expect_value(t, len(tags), 0)
@@ -168,12 +174,13 @@ test_parse_watson_frame_array_no_tags :: proc(t: ^testing.T) {
 test_parse_watson_frame_object_basic :: proc(t: ^testing.T) {
 	src := `[{"project":"api-backend","started_at":"2025-10-31T12:15:46Z","stopped_at":"2025-10-31T16:09:46Z","tags":["coding"]}]`
 	end, project, start, stop, tags, ok := parse_watson_frame_object(src, 0)
-	defer { delete(project); delete(start); delete(stop); for tag in tags do delete(tag); delete(tags) }
+	defer {delete(project); delete(start); delete(stop); for tag in tags do delete(tag)
+		delete(tags)}
 
 	testing.expect(t, ok)
 	testing.expect_value(t, project, "api-backend")
 	testing.expect_value(t, start, "2025-10-31 12:15:46")
-	testing.expect_value(t, stop,  "2025-10-31 16:09:46")
+	testing.expect_value(t, stop, "2025-10-31 16:09:46")
 	testing.expect_value(t, len(tags), 1)
 	testing.expect_value(t, tags[0], "coding")
 	_ = end
@@ -188,8 +195,10 @@ test_parse_edit_json_full :: proc(t: ^testing.T) {
   "stop_time": "2026-03-15 10:30:00",
   "tags": ["backend", "api"]
 }`
+
+
 	project, start, stop, tags, ok := parse_edit_json(src)
-	defer { delete(project); delete(start); delete(stop); for t in tags do delete(t); delete(tags) }
+	defer {delete(project); delete(start); delete(stop); for t in tags do delete(t); delete(tags)}
 
 	testing.expect(t, ok)
 	testing.expect_value(t, project, "myproject")
@@ -204,7 +213,7 @@ test_parse_edit_json_full :: proc(t: ^testing.T) {
 test_parse_edit_json_empty_tags :: proc(t: ^testing.T) {
 	src := `{"project": "proj", "start_time": "2026-03-15 09:00:00", "stop_time": "", "tags": []}`
 	project, start, stop, tags, ok := parse_edit_json(src)
-	defer { delete(project); delete(start); delete(stop); for t in tags do delete(t); delete(tags) }
+	defer {delete(project); delete(start); delete(stop); for t in tags do delete(t); delete(tags)}
 
 	testing.expect(t, ok)
 	testing.expect_value(t, project, "proj")
@@ -215,13 +224,13 @@ test_parse_edit_json_empty_tags :: proc(t: ^testing.T) {
 test_parse_edit_json_missing_project :: proc(t: ^testing.T) {
 	src := `{"start_time": "2026-03-15 09:00:00", "tags": []}`
 	_, _, _, tags, ok := parse_edit_json(src)
-	defer { delete(tags) }
+	defer {delete(tags)}
 	testing.expect(t, !ok, "should fail without project field")
 }
 
 @(test)
 test_frame_to_edit_json_roundtrip :: proc(t: ^testing.T) {
-	entry := TimeEntryInfo{
+	entry := TimeEntryInfo {
 		project    = "roundtrip",
 		start_time = "2026-03-15 08:00:00",
 		stop_time  = "2026-03-15 09:00:00",
@@ -230,7 +239,7 @@ test_frame_to_edit_json_roundtrip :: proc(t: ^testing.T) {
 	json := frame_to_edit_json(entry, "abc1234")
 
 	project, start, stop, tags, ok := parse_edit_json(json)
-	defer { delete(project); delete(start); delete(stop); for t in tags do delete(t); delete(tags) }
+	defer {delete(project); delete(start); delete(stop); for t in tags do delete(t); delete(tags)}
 
 	testing.expect(t, ok)
 	testing.expect_value(t, project, "roundtrip")

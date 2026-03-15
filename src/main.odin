@@ -32,7 +32,7 @@ main :: proc() {
 			delete(entry.tags)
 			delete(frame_id)
 		}
-		
+
 		// Calculate elapsed time
 		now := time.now()
 		// Parse start time (simplified - assumes format YYYY-MM-DD HH:MM:SS)
@@ -41,7 +41,7 @@ main :: proc() {
 			fmt.printf(" [%s]", entry.tags)
 		}
 		fmt.printf(" started at %s (frame: %s)\n", entry.start_time, frame_id)
-		
+
 	case "cancel":
 		if cancel_current_entry() {
 			fmt.println("Cancelled current activity")
@@ -181,7 +181,12 @@ main :: proc() {
 			fmt.print("[")
 			for r, i in rows {
 				if i > 0 do fmt.print(",")
-				fmt.printf("{\"date\":\"%s\",\"project\":\"%s\",\"seconds\":%d}", r.date, r.project, r.seconds)
+				fmt.printf(
+					"{\"date\":\"%s\",\"project\":\"%s\",\"seconds\":%d}",
+					r.date,
+					r.project,
+					r.seconds,
+				)
 			}
 			fmt.println("]")
 		} else {
@@ -281,25 +286,25 @@ main :: proc() {
 
 	case "help", "--help", "-h":
 		print_help()
-		
+
 	case "start":
 		if len(args) < 3 {
 			fmt.println("Error: project name required")
 			fmt.println("Usage: timer start <project> [+tag1 +tag2...] [--at HH:MM]")
 			os.exit(1)
 		}
-		
+
 		// Parse Watson-style arguments
 		parsed := parse_watson_args(args[2:])
 		defer free_parsed_args(&parsed)
-		
+
 		if len(parsed.positional) == 0 {
 			fmt.println("Error: project name required")
 			os.exit(1)
 		}
-		
+
 		project := parsed.positional[0]
-		
+
 		// Auto-stop current activity if running
 		current, frame_id, is_running := get_current_entry()
 		if is_running {
@@ -310,12 +315,17 @@ main :: proc() {
 				delete(current.tags)
 				delete(frame_id)
 			}
-			
+
 			if stop_tracking() {
-				fmt.printf("Stopped: %s [%s] (frame: %s)\n", current.project, current.tags, frame_id)
+				fmt.printf(
+					"Stopped: %s [%s] (frame: %s)\n",
+					current.project,
+					current.tags,
+					frame_id,
+				)
 			}
 		}
-		
+
 		if start_tracking(project, parsed.tags[:]) {
 			fmt.printf("Started: %s", project)
 			if len(parsed.tags) > 0 {
@@ -330,7 +340,7 @@ main :: proc() {
 		} else {
 			os.exit(1)
 		}
-		
+
 	case "stop":
 		// Get current entry before stopping
 		current, frame_id, is_running := get_current_entry()
@@ -345,7 +355,7 @@ main :: proc() {
 			delete(current.tags)
 			delete(frame_id)
 		}
-		
+
 		if stop_tracking() {
 			fmt.printf("Stopped: %s", current.project)
 			if len(current.tags) > 0 {
@@ -355,18 +365,18 @@ main :: proc() {
 		} else {
 			os.exit(1)
 		}
-		
+
 	case "frames":
 		frames := list_frame_ids()
 		defer {
 			for f in frames do delete(f)
 			delete(frames)
 		}
-		
+
 		for frame_id in frames {
 			fmt.println(frame_id)
 		}
-		
+
 	case "log":
 		parsed := parse_watson_args(args[2:])
 		defer free_parsed_args(&parsed)
@@ -394,8 +404,9 @@ main :: proc() {
 					fmt.printf("%s\n", date)
 					current_date = date
 				}
-				start_time := entry.start_time[11:16] if len(entry.start_time) >= 16 else entry.start_time
-				stop_time  := entry.stop_time[11:16]  if len(entry.stop_time)  >= 16 else "running"
+				start_time :=
+					entry.start_time[11:16] if len(entry.start_time) >= 16 else entry.start_time
+				stop_time := entry.stop_time[11:16] if len(entry.stop_time) >= 16 else "running"
 				fmt.printf("  %s to %-8s  %s", start_time, stop_time, entry.project)
 				if len(entry.tags) > 0 {
 					fmt.printf(" [%s]", entry.tags)
@@ -403,7 +414,7 @@ main :: proc() {
 				fmt.println()
 			}
 		}
-		
+
 	case "report":
 		parsed := parse_watson_args(args[2:])
 		defer free_parsed_args(&parsed)
@@ -422,7 +433,11 @@ main :: proc() {
 			fmt.print("{\"projects\":[")
 			for report, i in reports {
 				if i > 0 do fmt.print(",")
-				fmt.printf("{\"name\":\"%s\",\"seconds\":%d}", report.project, report.total_seconds)
+				fmt.printf(
+					"{\"name\":\"%s\",\"seconds\":%d}",
+					report.project,
+					report.total_seconds,
+				)
 			}
 			fmt.println("]}")
 		} else {
@@ -446,14 +461,14 @@ main :: proc() {
 			for i := 0; i < 45; i += 1 do fmt.print(".")
 			fmt.printf(" %s\n", format_duration(total_seconds))
 		}
-		
+
 	case "list":
 		if len(args) < 3 {
 			fmt.println("Error: list type required")
 			fmt.println("Usage: timer list <projects|entries|tags>")
 			os.exit(1)
 		}
-		
+
 		switch args[2] {
 		case "projects":
 			projects := list_projects()
@@ -472,20 +487,22 @@ main :: proc() {
 			fmt.println("Usage: timer list <projects|entries|tags>")
 			os.exit(1)
 		}
-		
+
 	case "add":
 		if len(args) < 3 {
 			fmt.println("Error: project name required")
-			fmt.println("Usage: timer add <project> --from <time> --to <time> [--tags tag1,tag2,...]")
+			fmt.println(
+				"Usage: timer add <project> --from <time> --to <time> [--tags tag1,tag2,...]",
+			)
 			os.exit(1)
 		}
-		
+
 		project := args[2]
 		from_time := ""
 		to_time := ""
 		tags: [dynamic]string
 		defer delete(tags)
-		
+
 		// Parse arguments
 		i := 3
 		for i < len(args) {
@@ -526,28 +543,32 @@ main :: proc() {
 				os.exit(1)
 			}
 		}
-		
+
 		if len(from_time) == 0 || len(to_time) == 0 {
 			fmt.println("Error: --from and --to are required")
-			fmt.println("Usage: timer add <project> --from <time> --to <time> [--tags tag1,tag2,...]")
+			fmt.println(
+				"Usage: timer add <project> --from <time> --to <time> [--tags tag1,tag2,...]",
+			)
 			os.exit(1)
 		}
-		
+
 		// Parse times
 		from_parsed, from_ok := parse_datetime(from_time)
 		to_parsed, to_ok := parse_datetime(to_time)
-		
+
 		if !from_ok || !to_ok {
-			fmt.println("Error: Invalid time format. Use 'YYYY-MM-DD HH:MM', 'YYYY-MM-DDTHH:MM', or 'HH:MM'")
+			fmt.println(
+				"Error: Invalid time format. Use 'YYYY-MM-DD HH:MM', 'YYYY-MM-DDTHH:MM', or 'HH:MM'",
+			)
 			os.exit(1)
 		}
-		
+
 		// Validate from < to
 		if from_parsed >= to_parsed {
 			fmt.println("Error: --from time must be before --to time")
 			os.exit(1)
 		}
-		
+
 		if add_time_entry(project, from_parsed, to_parsed, tags[:]) {
 			fmt.printf("Time entry added for project: %s\n", project)
 			fmt.printf("From: %s\n", from_parsed)
@@ -558,7 +579,7 @@ main :: proc() {
 		} else {
 			os.exit(1)
 		}
-		
+
 	case:
 		fmt.fprintf(os.stderr, "Unknown command: '%s'\n", args[1])
 		fmt.eprintln("Run 'wotin help' for usage.")
@@ -567,7 +588,8 @@ main :: proc() {
 }
 
 print_help :: proc() {
-	fmt.println(`wotin - Work Time Tracker
+	fmt.println(
+		`wotin - Work Time Tracker
 
 Usage: wotin <command> [args]
 
@@ -607,6 +629,6 @@ Examples:
   wotin edit abc1234 --from 09:00 --to 10:30
   wotin rename project old-name new-name
   wotin rename tag backend be
-`)
+`,
+	)
 }
-

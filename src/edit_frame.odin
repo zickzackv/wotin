@@ -30,7 +30,7 @@ edit_frame_in_editor :: proc(frame_id: string) -> bool {
 	editor := os.get_env("EDITOR")
 	if len(editor) == 0 do editor = "vi"
 
-	proc_desc := os2.Process_Desc{
+	proc_desc := os2.Process_Desc {
 		command = []string{editor, tmp_path},
 		stdin   = os2.stdin,
 		stdout  = os2.stdout,
@@ -104,7 +104,13 @@ frame_to_edit_json :: proc(entry: TimeEntryInfo, frame_id: string) -> string {
 
 // Minimal JSON field extractor — only handles the flat frame format we write above.
 // Returns allocated strings; caller must free.
-parse_edit_json :: proc(src: string) -> (project, start_time, stop_time: string, tags: [dynamic]string, ok: bool) {
+parse_edit_json :: proc(
+	src: string,
+) -> (
+	project, start_time, stop_time: string,
+	tags: [dynamic]string,
+	ok: bool,
+) {
 	tags = make([dynamic]string)
 
 	extract_string :: proc(src, key: string) -> (val: string, found: bool) {
@@ -121,7 +127,7 @@ parse_edit_json :: proc(src: string) -> (project, start_time, stop_time: string,
 	}
 
 	p, p_ok := extract_string(src, "project")
-	if !p_ok { delete(tags); return "", "", "", tags, false }
+	if !p_ok {delete(tags); return "", "", "", tags, false}
 	project = p
 
 	s, _ := extract_string(src, "start_time")
@@ -148,7 +154,7 @@ parse_edit_json :: proc(src: string) -> (project, start_time, stop_time: string,
 					if end < 0 do break
 					tag := strings.trim_space(inner[:end])
 					if len(tag) > 0 do append(&tags, strings.clone(tag))
-					inner = inner[end+1:]
+					inner = inner[end + 1:]
 					inner = strings.trim_left(inner, " \t\n\r,")
 				}
 			}

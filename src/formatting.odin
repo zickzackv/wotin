@@ -8,7 +8,7 @@ format_projects :: proc(projects: [dynamic]ProjectInfo) {
 		fmt.println("No projects found")
 		return
 	}
-	
+
 	// Calculate column widths
 	max_name := 7 // "Project"
 	for p in projects {
@@ -16,11 +16,11 @@ format_projects :: proc(projects: [dynamic]ProjectInfo) {
 			max_name = len(p.name)
 		}
 	}
-	
+
 	// Print header
 	fmt.printf("%-*s  %s\n", max_name, "Project", "Time")
 	fmt.println(strings.repeat("-", max_name + 2 + 5))
-	
+
 	// Print rows
 	for p in projects {
 		fmt.printf("%-*s  %s\n", max_name, p.name, p.total_time)
@@ -32,12 +32,12 @@ format_time_entries :: proc(entries: [dynamic]TimeEntryInfo) {
 		fmt.println("No time entries found")
 		return
 	}
-	
+
 	// Calculate column widths
 	max_project := 7 // "Project"
 	max_start := 19 // "2026-02-26 17:14"
 	max_stop := 5 // "Stop"
-	
+
 	for e in entries {
 		if len(e.project) > max_project {
 			max_project = len(e.project)
@@ -49,18 +49,36 @@ format_time_entries :: proc(entries: [dynamic]TimeEntryInfo) {
 			max_stop = len(e.stop_time)
 		}
 	}
-	
+
 	// Print header
-	fmt.printf("%-*s  %-*s  %-*s  %s\n", max_project, "Project", max_start, "Start", max_stop, "Stop", "Tags")
+	fmt.printf(
+		"%-*s  %-*s  %-*s  %s\n",
+		max_project,
+		"Project",
+		max_start,
+		"Start",
+		max_stop,
+		"Stop",
+		"Tags",
+	)
 	fmt.println(strings.repeat("-", max_project + 2 + max_start + 2 + max_stop + 2 + 20))
-	
+
 	// Print rows
 	for e in entries {
 		stop := e.stop_time
 		if len(stop) == 0 {
 			stop = "running"
 		}
-		fmt.printf("%-*s  %-*s  %-*s  %s\n", max_project, e.project, max_start, e.start_time, max_stop, stop, e.tags)
+		fmt.printf(
+			"%-*s  %-*s  %-*s  %s\n",
+			max_project,
+			e.project,
+			max_start,
+			e.start_time,
+			max_stop,
+			stop,
+			e.tags,
+		)
 	}
 }
 
@@ -69,7 +87,7 @@ format_tags :: proc(tags: [dynamic]TagInfo) {
 		fmt.println("No tags found")
 		return
 	}
-	
+
 	// Calculate column widths
 	max_name := 3 // "Tag"
 	for t in tags {
@@ -77,11 +95,11 @@ format_tags :: proc(tags: [dynamic]TagInfo) {
 			max_name = len(t.name)
 		}
 	}
-	
+
 	// Print header
 	fmt.printf("%-*s  %s\n", max_name, "Tag", "Count")
 	fmt.println(strings.repeat("-", max_name + 2 + 5))
-	
+
 	// Print rows
 	for t in tags {
 		fmt.printf("%-*s  %d\n", max_name, t.name, t.count)
