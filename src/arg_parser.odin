@@ -35,14 +35,14 @@ parse_watson_args :: proc(args: []string, allocator := context.allocator) -> Par
 		// Check for --flag syntax
 		if strings.has_prefix(arg, "--") {
 			flag_name := strings.trim_prefix(arg, "--")
-			
+
 			// Check if next arg is the value (not another flag/tag)
 			if i + 1 < len(args) && !strings.has_prefix(args[i + 1], "--") && !strings.has_prefix(args[i + 1], "+") {
 				result.flags[strings.clone(flag_name, allocator)] = strings.clone(args[i + 1], allocator)
 				i += 2
 			} else {
 				// Boolean flag (no value)
-				result.flags[strings.clone(flag_name, allocator)] = "true"
+				result.flags[strings.clone(flag_name, allocator)] = strings.clone("true", allocator)
 				i += 1
 			}
 			continue
@@ -62,6 +62,15 @@ parse_watson_args :: proc(args: []string, allocator := context.allocator) -> Par
 				append(&result.tags, strings.clone(trimmed, allocator))
 			}
 		}
+		// Free the key and value strings before removing from map
+		key := strings.clone("tags", context.temp_allocator) // just for lookup; real key freed below
+		for k in result.flags {
+			if k == "tags" {
+				delete(k, allocator)
+				break
+			}
+		}
+		delete(tags_str, allocator)
 		delete_key(&result.flags, "tags")
 	}
 	
@@ -70,7 +79,13 @@ parse_watson_args :: proc(args: []string, allocator := context.allocator) -> Par
 
 // Free parsed args memory
 free_parsed_args :: proc(args: ^ParsedArgs) {
+	for s in args.positional do delete(s)
 	delete(args.positional)
+	for s in args.tags do delete(s)
 	delete(args.tags)
+	for k, v in args.flags {
+		delete(k)
+		delete(v)
+	}
 	delete(args.flags)
 }

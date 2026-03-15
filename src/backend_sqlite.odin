@@ -695,3 +695,53 @@ format_duration :: proc(seconds: i64) -> string {
 	mins := (seconds % 3600) / 60
 	return fmt.tprintf("%dh %02dm", hours, mins)
 }
+
+// Get the most recently stopped entry (for restart)
+get_last_entry :: proc(allocator := context.allocator) -> (entry: TimeEntryInfo, frame_id: string, ok: bool) {
+	query := "SELECT te.frame_id, p.name, te.start_time, GROUP_CONCAT(t.name, ',') FROM time_entries te JOIN projects p ON te.project_id = p.id LEFT JOIN time_entry_tags tet ON te.id = tet.time_entry_id LEFT JOIN tags t ON tet.tag_id = t.id WHERE te.stop_time IS NOT NULL GROUP BY te.id ORDER BY te.stop_time DESC LIMIT 1"
+	query_cstr := strings.clone_to_cstring(query, context.temp_allocator)
+
+	stmt: ^Sqlite3_Stmt
+	if sqlite3_prepare_v2(db, query_cstr, -1, &stmt, nil) != SQLITE_OK {
+		return {}, "", false
+	}
+	defer sqlite3_finalize(stmt)
+
+	if sqlite3_step(stmt) == SQLITE_ROW {
+		fid := string(cstring(sqlite3_column_text(stmt, 0)))
+		project := string(cstring(sqlite3_column_text(stmt, 1)))
+		start_time := string(cstring(sqlite3_column_text(stmt, 2)))
+		tags_ptr := sqlite3_column_text(stmt, 3)
+		tags := ""
+		if tags_ptr != nil {
+			tags = string(cstring(tags_ptr))
+		}
+		return TimeEntryInfo{
+			project   = strings.clone(project, allocator),
+			start_time = strings.clone(start_time, allocator),
+			stop_time  = "",
+			tags       = strings.clone(tags, allocator),
+		}, strings.clone(fid, allocator), true
+	}
+	return {}, "", false
+}
+
+// Delete a time entry by frame ID; returns false if not found
+remove_entry_by_frame_id :: proc(frame_id: string) -> bool {
+	query := "DELETE FROM time_entries WHERE frame_id = ?"
+	query_cstr := strings.clone_to_cstring(query, context.temp_allocator)
+
+	stmt: ^Sqlite3_Stmt
+	if sqlite3_prepare_v2(db, query_cstr, -1, &stmt, nil) != SQLITE_OK {
+		return false
+	}
+	defer sqlite3_finalize(stmt)
+
+	fid_cstr := strings.clone_to_cstring(frame_id, context.temp_allocator)
+	sqlite3_bind_text(stmt, 1, fid_cstr, -1, nil)
+
+	if sqlite3_step(stmt) != SQLITE_DONE {
+		return false
+	}
+	return sqlite3_changes(db) > 0
+}

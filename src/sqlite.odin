@@ -27,4 +27,5 @@ foreign sqlite3 {
     sqlite3_column_text :: proc(stmt: ^Sqlite3_Stmt, iCol: c.int) -> cstring ---
     sqlite3_errmsg :: proc(db: ^Sqlite3) -> cstring ---
     sqlite3_last_insert_rowid :: proc(db: ^Sqlite3) -> i64 ---
+    sqlite3_changes :: proc(db: ^Sqlite3) -> c.int ---
 }

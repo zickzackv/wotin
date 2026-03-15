@@ -14,11 +14,7 @@ main :: proc() {
 
 	args := os.args
 	if len(args) < 2 {
-		fmt.println("Usage: timer <start|stop|list|add>")
-		fmt.println("  start <project> [--tags tag1,tag2,...]")
-		fmt.println("  stop")
-		fmt.println("  list <projects|entries|tags>")
-		fmt.println("  add <project> --from <time> --to <time> [--tags tag1,tag2,...]")
+		print_help()
 		return
 	}
 
@@ -82,6 +78,111 @@ main :: proc() {
 			fmt.eprintln("Error: No timer is currently running")
 			os.exit(1)
 		}
+
+	case "current":
+		entry, frame_id, ok := get_current_entry()
+		if !ok {
+			fmt.println("No timer is currently running")
+			os.exit(1)
+		}
+		defer {
+			delete(entry.project)
+			delete(entry.start_time)
+			delete(entry.stop_time)
+			delete(entry.tags)
+			delete(frame_id)
+		}
+		fmt.printf("Project %s", entry.project)
+		if len(entry.tags) > 0 {
+			fmt.printf(" [%s]", entry.tags)
+		}
+		fmt.printf(" started at %s (frame: %s)\n", entry.start_time, frame_id)
+
+	case "restart":
+		// Auto-stop current if running
+		current, cur_frame, is_running := get_current_entry()
+		if is_running {
+			defer {
+				delete(current.project)
+				delete(current.start_time)
+				delete(current.stop_time)
+				delete(current.tags)
+				delete(cur_frame)
+			}
+			if stop_tracking() {
+				fmt.printf("Stopped: %s (frame: %s)\n", current.project, cur_frame)
+			}
+		}
+
+		last, _, has_last := get_last_entry()
+		if !has_last {
+			fmt.eprintln("Error: No previous activity to restart")
+			os.exit(1)
+		}
+		defer {
+			delete(last.project)
+			delete(last.start_time)
+			delete(last.stop_time)
+			delete(last.tags)
+		}
+
+		// Rebuild tags slice from comma-separated string
+		tags: [dynamic]string
+		defer delete(tags)
+		if len(last.tags) > 0 {
+			for t in strings.split(last.tags, ",", context.temp_allocator) {
+				trimmed := strings.trim_space(t)
+				if len(trimmed) > 0 do append(&tags, trimmed)
+			}
+		}
+
+		if start_tracking(last.project, tags[:]) {
+			fmt.printf("Restarted: %s", last.project)
+			if len(last.tags) > 0 {
+				fmt.printf(" [%s]", last.tags)
+			}
+			fmt.println()
+		} else {
+			os.exit(1)
+		}
+
+	case "remove":
+		if len(args) < 3 {
+			fmt.eprintln("Error: frame ID required")
+			fmt.eprintln("Usage: wotin remove <frame_id>")
+			os.exit(1)
+		}
+		frame_id := args[2]
+		if remove_entry_by_frame_id(frame_id) {
+			fmt.printf("Removed frame %s\n", frame_id)
+		} else {
+			fmt.fprintf(os.stderr, "Error: frame '%s' not found\n", frame_id)
+			os.exit(1)
+		}
+
+	case "projects":
+		projects := list_projects()
+		defer {
+			for p in projects {
+				delete(p.name)
+				delete(p.total_time)
+			}
+			delete(projects)
+		}
+		format_projects(projects)
+
+	case "tags":
+		tags := list_tags()
+		defer {
+			for t in tags {
+				delete(t.name)
+			}
+			delete(tags)
+		}
+		format_tags(tags)
+
+	case "help", "--help", "-h":
+		print_help()
 		
 	case "start":
 		if len(args) < 3 {
@@ -377,9 +478,43 @@ main :: proc() {
 		}
 		
 	case:
-		fmt.printf("Unknown command: '%s'\n", args[1])
-		fmt.println("Usage: timer <start|stop|list|add>")
+		fmt.fprintf(os.stderr, "Unknown command: '%s'\n", args[1])
+		fmt.eprintln("Run 'wotin help' for usage.")
 		os.exit(1)
 	}
+}
+
+print_help :: proc() {
+	fmt.println(`wotin - Work Time Tracker
+
+Usage: wotin <command> [args]
+
+Tracking:
+  start <project> [+tag...] [--at HH:MM]  Start tracking (auto-stops current)
+  stop                                      Stop current activity
+  cancel                                    Delete current activity without saving
+  restart                                   Restart the last stopped activity
+  status / current                          Show currently running activity
+
+Viewing:
+  log [--json]                              List activities grouped by date
+  report [--json]                           Aggregated time by project and tags
+  frames                                    List all frame IDs
+  projects                                  List all projects with total time
+  tags                                      List all tags with usage count
+
+Management:
+  remove <frame_id>                         Delete an entry by frame ID
+  add <project> --from <t> --to <t>         Manually add a past activity
+    [+tag...] [--tags tag1,tag2]
+
+Examples:
+  wotin start myproject +backend +api
+  wotin stop
+  wotin restart
+  wotin log
+  wotin report --json
+  wotin remove abc1234
+`)
 }
 
