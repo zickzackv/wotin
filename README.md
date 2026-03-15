@@ -262,6 +262,7 @@ Planned features (not yet implemented):
 - Colored output in all commands
 - Per-subcommand help (`-h` / `--help` on each subcommand)
 - Better error messages when subcommands are called with wrong arguments
+- `version` subcommand (`wotin version` / `wotin --version`)
 
 ## Contributing
 
