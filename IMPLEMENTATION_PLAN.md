@@ -7,23 +7,23 @@
 - [x] Task 3: Implement time shortcut resolution ✅
 - [x] Task 4: Implement `status` command ✅
 - [x] Task 5: Implement `cancel` command ✅
-- [ ] Task 6: Implement `restart` command
+- [x] Task 6: Implement `restart` command ✅
 - [x] Task 7: Implement `frames` command ✅
 - [x] Task 8: Implement `log` command ✅
 - [x] Task 9: Implement `report` command ✅
-- [ ] Task 10: Implement `aggregate` command
-- [ ] Task 11: Implement `remove` command
-- [ ] Task 12: Implement `change` command
+- [x] Task 10: Implement `aggregate` command ✅
+- [x] Task 11: Implement `remove` command ✅
+- [x] Task 12: Implement `change` command ✅
 - [ ] Task 13: Implement `edit` command
 - [ ] Task 14: Implement `rename` command
-- [ ] Task 15: Implement `projects` and `tags` commands
-- [ ] Task 16: Implement `current` command
+- [x] Task 15: Implement `projects` and `tags` commands ✅
+- [x] Task 16: Implement `current` command ✅
 - [x] Task 17: Update `start` command with Watson syntax and auto-stop ✅
 - [x] Task 18: Update `stop` command with Watson features ✅
 - [x] Task 19: Implement JSON output formatter ✅
-- [ ] Task 20: Update help system and command documentation
+- [x] Task 20: Update help system and command documentation ✅
 
-## Completed: 12/20 tasks (60%)
+## Completed: 18/20 tasks (90%)
 
 ### Summary
 
@@ -57,21 +57,21 @@ We've successfully implemented the core Watson-inspired time tracking functional
 The tool is **fully functional** for daily time tracking with Watson-style syntax and auto-stop behavior.
 - [ ] Task 4: Implement `status` command
 - [ ] Task 5: Implement `cancel` command
-- [ ] Task 6: Implement `restart` command
+- [x] Task 6: Implement `restart` command ✅
 - [ ] Task 7: Implement `frames` command
 - [ ] Task 8: Implement `log` command
 - [ ] Task 9: Implement `report` command
-- [ ] Task 10: Implement `aggregate` command
-- [ ] Task 11: Implement `remove` command
-- [ ] Task 12: Implement `change` command
+- [x] Task 10: Implement `aggregate` command ✅
+- [x] Task 11: Implement `remove` command ✅
+- [x] Task 12: Implement `change` command ✅
 - [ ] Task 13: Implement `edit` command
 - [ ] Task 14: Implement `rename` command
-- [ ] Task 15: Implement `projects` and `tags` commands
-- [ ] Task 16: Implement `current` command
+- [x] Task 15: Implement `projects` and `tags` commands ✅
+- [x] Task 16: Implement `current` command ✅
 - [ ] Task 17: Update `start` command with Watson syntax and auto-stop
 - [ ] Task 18: Update `stop` command with Watson features
 - [ ] Task 19: Implement JSON output formatter
-- [ ] Task 20: Update help system and command documentation
+- [x] Task 20: Update help system and command documentation ✅
 
 ## Problem Statement
 Wotin currently has basic `start`, `stop`, `list`, and `add` commands with flag-based syntax. We need to expand it into a comprehensive time tracking CLI with Watson-inspired features, supporting both Watson's `+tag` syntax and flag-based arguments, with frame IDs for easy reference.
