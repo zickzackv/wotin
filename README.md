@@ -129,6 +129,28 @@ wotin add <project> --from <time> --to <time> [--tags tag1,tag2]
 - Frame IDs: Automatically generated 7-character hashes for each entry
 - Migration: Automatically adds frame_id column to existing databases
 
+### Custom Database Path
+
+The database location can be overridden in two ways:
+
+```bash
+# Environment variable (persists for the shell session)
+export WOTIN_DB=~/work.db
+wotin log
+
+# Global flag (one-off)
+wotin --db ~/work.db log --today
+```
+
+This is useful for keeping a separate test database during development:
+
+```nix
+# flake.nix devShell
+shellHook = ''
+  export WOTIN_DB="$PWD/.wotin-dev.db"
+'';
+```
+
 ## Examples
 
 ### Typical Workflow

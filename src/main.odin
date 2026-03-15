@@ -587,7 +587,11 @@ print_help :: proc() {
 	fmt.println(
 		`wotin - Work Time Tracker
 
-Usage: wotin <command> [args]
+Usage: wotin [--db <path>] <command> [args]
+
+Global options:
+  --db <path>                                Use a specific database file
+                                             (overrides WOTIN_DB env var)
 
 Tracking:
   start <project> [+tag...] [--at HH:MM]   Start tracking (auto-stops current)
@@ -617,6 +621,10 @@ Management:
 
 Time formats: HH:MM  or  YYYY-MM-DD HH:MM
 
+Environment:
+  WOTIN_DB                                   Path to the SQLite database file
+                                             Default: ~/.wotin/timetracking.db
+
 Examples:
   wotin start myproject +backend +api
   wotin log --today
@@ -625,6 +633,8 @@ Examples:
   wotin edit abc1234 --from 09:00 --to 10:30
   wotin rename project old-name new-name
   wotin rename tag backend be
+  WOTIN_DB=~/work.db wotin log
+  wotin --db ~/work.db log --today
 `,
 	)
 }
