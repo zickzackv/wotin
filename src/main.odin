@@ -361,6 +361,7 @@ main :: proc() {
 		entries := list_time_entries(from_sql, to_sql)
 		defer {
 			for e in entries {
+				delete(e.frame_id)
 				delete(e.project)
 				delete(e.start_time)
 				delete(e.stop_time)
@@ -386,6 +387,9 @@ main :: proc() {
 				fmt.printf("  %s to %-8s  %s", start_time, stop_time, entry.project)
 				if len(entry.tags) > 0 {
 					fmt.printf(" [%s]", entry.tags)
+				}
+				if len(entry.frame_id) > 0 {
+					fmt.printf("  (%s)", entry.frame_id)
 				}
 				fmt.println()
 			}
@@ -452,7 +456,16 @@ main :: proc() {
 			format_projects(projects)
 		case "entries":
 			entries := list_time_entries()
-			defer delete(entries)
+			defer {
+				for e in entries {
+					delete(e.frame_id)
+					delete(e.project)
+					delete(e.start_time)
+					delete(e.stop_time)
+					delete(e.tags)
+				}
+				delete(entries)
+			}
 			format_time_entries(entries)
 		case "tags":
 			tags := list_tags()

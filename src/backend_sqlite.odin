@@ -332,6 +332,7 @@ ProjectInfo :: struct {
 }
 
 TimeEntryInfo :: struct {
+	frame_id:   string,
 	project:    string,
 	start_time: string,
 	stop_time:  string,
@@ -377,7 +378,7 @@ list_time_entries :: proc(
 ) -> [dynamic]TimeEntryInfo {
 	results := make([dynamic]TimeEntryInfo, allocator)
 
-	base := "SELECT p.name, te.start_time, COALESCE(te.stop_time, ''), GROUP_CONCAT(t.name, ',') FROM time_entries te JOIN projects p ON te.project_id = p.id LEFT JOIN time_entry_tags tet ON te.id = tet.time_entry_id LEFT JOIN tags t ON tet.tag_id = t.id"
+	base := "SELECT COALESCE(te.frame_id,''), p.name, te.start_time, COALESCE(te.stop_time, ''), GROUP_CONCAT(t.name, ',') FROM time_entries te JOIN projects p ON te.project_id = p.id LEFT JOIN time_entry_tags tet ON te.id = tet.time_entry_id LEFT JOIN tags t ON tet.tag_id = t.id"
 	query: string
 	if len(from_sql) > 0 && len(to_sql) > 0 {
 		query = fmt.tprintf(
@@ -398,10 +399,11 @@ list_time_entries :: proc(
 	defer sqlite3_finalize(stmt)
 
 	for sqlite3_step(stmt) == SQLITE_ROW {
-		project := string(cstring(sqlite3_column_text(stmt, 0)))
-		start_time := string(cstring(sqlite3_column_text(stmt, 1)))
-		stop_time := string(cstring(sqlite3_column_text(stmt, 2)))
-		tags_ptr := sqlite3_column_text(stmt, 3)
+		frame_id := string(cstring(sqlite3_column_text(stmt, 0)))
+		project := string(cstring(sqlite3_column_text(stmt, 1)))
+		start_time := string(cstring(sqlite3_column_text(stmt, 2)))
+		stop_time := string(cstring(sqlite3_column_text(stmt, 3)))
+		tags_ptr := sqlite3_column_text(stmt, 4)
 		tags := ""
 		if tags_ptr != nil {
 			tags = string(cstring(tags_ptr))
@@ -410,6 +412,7 @@ list_time_entries :: proc(
 		append(
 			&results,
 			TimeEntryInfo {
+				frame_id = strings.clone(frame_id, allocator),
 				project = strings.clone(project, allocator),
 				start_time = strings.clone(start_time, allocator),
 				stop_time = strings.clone(stop_time, allocator),
