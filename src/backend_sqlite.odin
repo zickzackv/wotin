@@ -1,11 +1,9 @@
 package main
 
-import "core:c"
 import "core:fmt"
 import "core:os"
 import "core:path/filepath"
 import "core:strings"
-import "core:time"
 
 db: ^Sqlite3
 
@@ -241,8 +239,7 @@ start_tracking :: proc(project: string, tags: []string) -> bool {
 	}
 
 	// Generate frame ID
-	start_time := fmt.tprintf("%v", time.now())
-	frame_id := generate_frame_id(project, start_time)
+	frame_id := generate_frame_id(project, "")
 
 	// Insert time entry with frame_id
 	insert_sql := "INSERT INTO time_entries (project_id, start_time, frame_id) VALUES (?, strftime('%Y-%m-%d %H:%M:%S', 'now'), ?)"

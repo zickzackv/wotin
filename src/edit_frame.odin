@@ -68,7 +68,7 @@ edit_frame_in_editor :: proc(frame_id: string) -> bool {
 		delete(new_tags)
 	}
 
-	has_tags := len(new_tags) > 0
+	has_tags := true
 	if !change_entry(frame_id, new_project, new_tags[:], has_tags) {
 		fmt.eprintln("Error: failed to update project/tags")
 		return false

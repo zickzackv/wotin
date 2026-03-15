@@ -3,7 +3,6 @@ package main
 import "core:fmt"
 import "core:os"
 import "core:strings"
-import "core:time"
 
 main :: proc() {
 	if !init_database() {
@@ -19,7 +18,7 @@ main :: proc() {
 	}
 
 	switch args[1] {
-	case "status":
+	case "status", "current":
 		entry, frame_id, ok := get_current_entry()
 		if !ok {
 			fmt.println("No timer is currently running")
@@ -32,10 +31,6 @@ main :: proc() {
 			delete(entry.tags)
 			delete(frame_id)
 		}
-
-		// Calculate elapsed time
-		now := time.now()
-		// Parse start time (simplified - assumes format YYYY-MM-DD HH:MM:SS)
 		fmt.printf("Project %s", entry.project)
 		if len(entry.tags) > 0 {
 			fmt.printf(" [%s]", entry.tags)
@@ -49,25 +44,6 @@ main :: proc() {
 			fmt.eprintln("Error: No timer is currently running")
 			os.exit(1)
 		}
-
-	case "current":
-		entry, frame_id, ok := get_current_entry()
-		if !ok {
-			fmt.println("No timer is currently running")
-			os.exit(1)
-		}
-		defer {
-			delete(entry.project)
-			delete(entry.start_time)
-			delete(entry.stop_time)
-			delete(entry.tags)
-			delete(frame_id)
-		}
-		fmt.printf("Project %s", entry.project)
-		if len(entry.tags) > 0 {
-			fmt.printf(" [%s]", entry.tags)
-		}
-		fmt.printf(" started at %s (frame: %s)\n", entry.start_time, frame_id)
 
 	case "restart":
 		// Auto-stop current if running
