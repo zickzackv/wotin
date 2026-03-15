@@ -19,35 +19,6 @@ main :: proc() {
 	}
 
 	switch args[1] {
-	case "test-parse":
-		// Test the argument parser
-		if len(args) < 3 {
-			fmt.println("Usage: timer test-parse <args...>")
-			return
-		}
-		parsed := parse_watson_args(args[2:])
-		defer free_parsed_args(&parsed)
-		
-		fmt.println("Positional:", parsed.positional)
-		fmt.println("Tags:", parsed.tags)
-		fmt.println("Flags:", parsed.flags)
-		
-	case "test-time":
-		// Test time shortcuts
-		if len(args) < 3 {
-			fmt.println("Usage: timer test-time --today|--yesterday|--week|--month|--year")
-			return
-		}
-		parsed := parse_watson_args(args[2:])
-		defer free_parsed_args(&parsed)
-		
-		range, ok := resolve_time_range(parsed.flags)
-		if ok {
-			fmt.println("Time range:", format_time_range(range))
-		} else {
-			fmt.println("Failed to resolve time range")
-		}
-		
 	case "status":
 		entry, frame_id, ok := get_current_entry()
 		if !ok {
@@ -196,7 +167,8 @@ main :: proc() {
 		parsed := parse_watson_args(args[2:])
 		defer free_parsed_args(&parsed)
 
-		rows := get_aggregate_data()
+		from_sql, to_sql := resolve_time_range_sql(parsed.flags)
+		rows := get_aggregate_data(from_sql, to_sql)
 		defer {
 			for r in rows {
 				delete(r.date)
@@ -343,11 +315,11 @@ main :: proc() {
 		}
 		
 	case "log":
-		// Parse arguments
 		parsed := parse_watson_args(args[2:])
 		defer free_parsed_args(&parsed)
-		
-		entries := list_time_entries()
+
+		from_sql, to_sql := resolve_time_range_sql(parsed.flags)
+		entries := list_time_entries(from_sql, to_sql)
 		defer {
 			for e in entries {
 				delete(e.project)
@@ -357,27 +329,20 @@ main :: proc() {
 			}
 			delete(entries)
 		}
-		
-		// Check for JSON output
+
 		if _, has_json := parsed.flags["json"]; has_json {
 			fmt.println(format_entries_json(entries[:]))
 		} else {
-			// Group by date
 			current_date := ""
 			for entry in entries {
-				// Extract date from start_time (YYYY-MM-DD HH:MM:SS)
 				date := entry.start_time[:10] if len(entry.start_time) >= 10 else ""
-				
 				if date != current_date {
 					if current_date != "" do fmt.println()
 					fmt.printf("%s\n", date)
 					current_date = date
 				}
-				
-				// Format: HH:MM to HH:MM  Duration  Project [tags]
 				start_time := entry.start_time[11:16] if len(entry.start_time) >= 16 else entry.start_time
-				stop_time := entry.stop_time[11:16] if len(entry.stop_time) >= 16 else "running"
-				
+				stop_time  := entry.stop_time[11:16]  if len(entry.stop_time)  >= 16 else "running"
 				fmt.printf("  %s to %-8s  %s", start_time, stop_time, entry.project)
 				if len(entry.tags) > 0 {
 					fmt.printf(" [%s]", entry.tags)
@@ -387,11 +352,11 @@ main :: proc() {
 		}
 		
 	case "report":
-		// Parse arguments
 		parsed := parse_watson_args(args[2:])
 		defer free_parsed_args(&parsed)
-		
-		reports := get_report_data()
+
+		from_sql, to_sql := resolve_time_range_sql(parsed.flags)
+		reports := get_report_data(from_sql, to_sql)
 		defer {
 			for r in reports {
 				delete(r.project)
@@ -399,10 +364,8 @@ main :: proc() {
 			}
 			delete(reports)
 		}
-		
-		// Check for JSON output
+
 		if _, has_json := parsed.flags["json"]; has_json {
-			// Simple JSON output
 			fmt.print("{\"projects\":[")
 			for report, i in reports {
 				if i > 0 do fmt.print(",")
@@ -411,27 +374,20 @@ main :: proc() {
 			fmt.println("]}")
 		} else {
 			total_seconds: i64 = 0
-			
 			for report in reports {
 				if report.total_seconds == 0 do continue
-				
 				fmt.printf("%s", report.project)
-				// Pad to 50 chars
 				padding := 50 - len(report.project)
 				for i := 0; i < padding; i += 1 do fmt.print(".")
 				fmt.printf(" %s\n", format_duration(report.total_seconds))
-				
-				// Show tag breakdown
 				for tag, seconds in report.tag_times {
 					fmt.printf("    [%s]", tag)
 					tag_padding := 42 - len(tag)
 					for i := 0; i < tag_padding; i += 1 do fmt.print(".")
 					fmt.printf(" %s\n", format_duration(seconds))
 				}
-				
 				total_seconds += report.total_seconds
 			}
-			
 			fmt.println()
 			fmt.printf("Total")
 			for i := 0; i < 45; i += 1 do fmt.print(".")
@@ -563,36 +519,39 @@ print_help :: proc() {
 Usage: wotin <command> [args]
 
 Tracking:
-  start <project> [+tag...] [--at HH:MM]  Start tracking (auto-stops current)
-  stop                                      Stop current activity
-  cancel                                    Delete current activity without saving
-  restart                                   Restart the last stopped activity
-  status / current                          Show currently running activity
+  start <project> [+tag...] [--at HH:MM]   Start tracking (auto-stops current)
+  stop                                       Stop current activity
+  cancel                                     Delete current activity without saving
+  restart                                    Restart the last stopped activity
+  status / current                           Show currently running activity
 
 Viewing:
-  log [--json]                              List activities grouped by date
-  report [--json]                           Aggregated time by project and tags
-  aggregate [--json]                        Daily time breakdown per project
-  frames                                    List all frame IDs
-  projects                                  List all projects with total time
-  tags                                      List all tags with usage count
+  log [--json] [--today|--week|--month|--year|--from T --to T]
+  report [--json] [--today|--week|--month|--year|--from T --to T]
+  aggregate [--json] [--today|--week|--month|--year|--from T --to T]
+  frames                                     List all frame IDs
+  projects                                   List all projects with total time
+  tags                                       List all tags with usage count
 
 Management:
-  remove <frame_id>                         Delete an entry by frame ID
-  change <frame_id> [--project <n>]         Change project and/or tags of an entry
+  remove <frame_id>                          Delete an entry by frame ID
+  change <frame_id> [--project <n>]          Change project and/or tags
     [+tag...] [--tags tag1,tag2]
-  add <project> --from <t> --to <t>         Manually add a past activity
+  edit <frame_id> [--from <t>] [--to <t>]   Edit start/stop times
+  rename project|tag <old> <new>             Rename a project or tag everywhere
+  add <project> --from <t> --to <t>          Manually add a past activity
     [+tag...] [--tags tag1,tag2]
+
+Time formats: HH:MM  or  YYYY-MM-DD HH:MM
 
 Examples:
   wotin start myproject +backend +api
-  wotin stop
-  wotin restart
-  wotin log
-  wotin aggregate
-  wotin report --json
-  wotin remove abc1234
-  wotin change abc1234 --project newproject +newtag
+  wotin log --today
+  wotin report --week
+  wotin aggregate --month
+  wotin edit abc1234 --from 09:00 --to 10:30
+  wotin rename project old-name new-name
+  wotin rename tag backend be
 `)
 }
 

@@ -375,10 +375,16 @@ list_projects :: proc(allocator := context.allocator) -> [dynamic]ProjectInfo {
     return results
 }
 
-list_time_entries :: proc(allocator := context.allocator) -> [dynamic]TimeEntryInfo {
+list_time_entries :: proc(from_sql: string = "", to_sql: string = "", allocator := context.allocator) -> [dynamic]TimeEntryInfo {
     results := make([dynamic]TimeEntryInfo, allocator)
-    
-    query := "SELECT p.name, te.start_time, COALESCE(te.stop_time, ''), GROUP_CONCAT(t.name, ',') FROM time_entries te JOIN projects p ON te.project_id = p.id LEFT JOIN time_entry_tags tet ON te.id = tet.time_entry_id LEFT JOIN tags t ON tet.tag_id = t.id GROUP BY te.id ORDER BY te.start_time DESC"
+
+    base := "SELECT p.name, te.start_time, COALESCE(te.stop_time, ''), GROUP_CONCAT(t.name, ',') FROM time_entries te JOIN projects p ON te.project_id = p.id LEFT JOIN time_entry_tags tet ON te.id = tet.time_entry_id LEFT JOIN tags t ON tet.tag_id = t.id"
+    query: string
+    if len(from_sql) > 0 && len(to_sql) > 0 {
+        query = fmt.tprintf("%s WHERE te.start_time >= '%s' AND te.start_time <= '%s' GROUP BY te.id ORDER BY te.start_time DESC", base, from_sql, to_sql)
+    } else {
+        query = fmt.tprintf("%s GROUP BY te.id ORDER BY te.start_time DESC", base)
+    }
     query_cstr := strings.clone_to_cstring(query, context.temp_allocator)
     
     stmt: ^Sqlite3_Stmt
@@ -628,18 +634,22 @@ ProjectReport :: struct {
 }
 
 // Get report data
-get_report_data :: proc(allocator := context.allocator) -> [dynamic]ProjectReport {
+get_report_data :: proc(from_sql: string = "", to_sql: string = "", allocator := context.allocator) -> [dynamic]ProjectReport {
 	results := make([dynamic]ProjectReport, allocator)
-	
-	// Get project totals
-	query := `
-		SELECT p.name, 
-		       COALESCE(SUM(CAST((julianday(COALESCE(te.stop_time, strftime('%Y-%m-%d %H:%M:%S', 'now'))) - julianday(te.start_time)) * 24 * 60 * 60 AS INTEGER)), 0) as seconds
+
+	time_filter := ""
+	if len(from_sql) > 0 && len(to_sql) > 0 {
+		time_filter = fmt.tprintf("AND te.start_time >= '%s' AND te.start_time <= '%s'", from_sql, to_sql)
+	}
+
+	query := fmt.tprintf(`
+		SELECT p.name,
+		       COALESCE(SUM(CAST((julianday(COALESCE(te.stop_time, strftime('%%Y-%%m-%%d %%H:%%M:%%S', 'now'))) - julianday(te.start_time)) * 24 * 60 * 60 AS INTEGER)), 0) as seconds
 		FROM projects p
-		LEFT JOIN time_entries te ON p.id = te.project_id
+		LEFT JOIN time_entries te ON p.id = te.project_id %s
 		GROUP BY p.id, p.name
 		ORDER BY p.name
-	`
+	`, time_filter)
 	query_cstr := strings.clone_to_cstring(query, context.temp_allocator)
 	
 	stmt: ^Sqlite3_Stmt
@@ -658,17 +668,21 @@ get_report_data :: proc(allocator := context.allocator) -> [dynamic]ProjectRepor
 			tag_times = make(map[string]i64, allocator=allocator),
 		}
 		
-		// Get tag breakdown for this project
-		tag_query := `
+		// Get tag breakdown for this project (respecting time filter)
+		tag_time_filter := ""
+		if len(from_sql) > 0 && len(to_sql) > 0 {
+			tag_time_filter = fmt.tprintf("AND te.start_time >= '%s' AND te.start_time <= '%s'", from_sql, to_sql)
+		}
+		tag_query := fmt.tprintf(`
 			SELECT t.name,
-			       COALESCE(SUM(CAST((julianday(COALESCE(te.stop_time, strftime('%Y-%m-%d %H:%M:%S', 'now'))) - julianday(te.start_time)) * 24 * 60 * 60 AS INTEGER)), 0) as seconds
+			       COALESCE(SUM(CAST((julianday(COALESCE(te.stop_time, strftime('%%Y-%%m-%%d %%H:%%M:%%S', 'now'))) - julianday(te.start_time)) * 24 * 60 * 60 AS INTEGER)), 0) as seconds
 			FROM time_entries te
 			JOIN projects p ON te.project_id = p.id
 			JOIN time_entry_tags tet ON te.id = tet.time_entry_id
 			JOIN tags t ON tet.tag_id = t.id
-			WHERE p.name = ?
+			WHERE p.name = ? %s
 			GROUP BY t.id, t.name
-		`
+		`, tag_time_filter)
 		tag_query_cstr := strings.clone_to_cstring(tag_query, context.temp_allocator)
 		project_cstr := strings.clone_to_cstring(project, context.temp_allocator)
 		
@@ -822,17 +836,23 @@ DailyAggregate :: struct {
 }
 
 // Get daily aggregated time per project
-get_aggregate_data :: proc(allocator := context.allocator) -> [dynamic]DailyAggregate {
+get_aggregate_data :: proc(from_sql: string = "", to_sql: string = "", allocator := context.allocator) -> [dynamic]DailyAggregate {
 	results := make([dynamic]DailyAggregate, allocator)
 
-	query := `
+	time_filter := ""
+	if len(from_sql) > 0 && len(to_sql) > 0 {
+		time_filter = fmt.tprintf("WHERE te.start_time >= '%s' AND te.start_time <= '%s'", from_sql, to_sql)
+	}
+
+	query := fmt.tprintf(`
 		SELECT date(te.start_time) as day, p.name,
-		       CAST(SUM((julianday(COALESCE(te.stop_time, strftime('%Y-%m-%d %H:%M:%S','now'))) - julianday(te.start_time)) * 86400) AS INTEGER)
+		       CAST(SUM((julianday(COALESCE(te.stop_time, strftime('%%Y-%%m-%%d %%H:%%M:%%S','now'))) - julianday(te.start_time)) * 86400) AS INTEGER)
 		FROM time_entries te
 		JOIN projects p ON te.project_id = p.id
+		%s
 		GROUP BY day, p.id
 		ORDER BY day DESC, p.name
-	`
+	`, time_filter)
 	query_cstr := strings.clone_to_cstring(query, context.temp_allocator)
 	stmt: ^Sqlite3_Stmt
 	if sqlite3_prepare_v2(db, query_cstr, -1, &stmt, nil) != SQLITE_OK {
