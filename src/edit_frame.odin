@@ -1,9 +1,19 @@
 package main
 
+import "core:encoding/json"
 import "core:fmt"
 import "core:os"
 import os2 "core:os/os2"
 import "core:strings"
+
+// JSON struct for editing a frame
+EditFrameJson :: struct {
+	frame_id:   string `json:"frame_id"`,
+	project:    string `json:"project"`,
+	start_time: string `json:"start_time"`,
+	stop_time:  string `json:"stop_time"`,
+	tags:       []string `json:"tags"`,
+}
 
 // Open a frame in $EDITOR as JSON, apply changes on save.
 edit_frame_in_editor :: proc(frame_id: string) -> bool {
@@ -20,8 +30,8 @@ edit_frame_in_editor :: proc(frame_id: string) -> bool {
 	}
 
 	tmp_path := fmt.tprintf("/tmp/wotin_edit_%s.json", frame_id)
-	json := frame_to_edit_json(entry, frame_id)
-	if !os.write_entire_file(tmp_path, transmute([]byte)json) {
+	json_str := frame_to_edit_json(entry, frame_id)
+	if !os.write_entire_file(tmp_path, transmute([]byte)json_str) {
 		fmt.eprintln("Error: could not write temp file")
 		return false
 	}
@@ -68,8 +78,7 @@ edit_frame_in_editor :: proc(frame_id: string) -> bool {
 		delete(new_tags)
 	}
 
-	has_tags := true
-	if !change_entry(frame_id, new_project, new_tags[:], has_tags) {
+	if !change_entry(frame_id, new_project, new_tags[:], true) {
 		fmt.eprintln("Error: failed to update project/tags")
 		return false
 	}
@@ -82,28 +91,28 @@ edit_frame_in_editor :: proc(frame_id: string) -> bool {
 	return true
 }
 
-// Produce a human-friendly JSON for editing
 frame_to_edit_json :: proc(entry: TimeEntryInfo, frame_id: string) -> string {
-	b := strings.builder_make(context.temp_allocator)
-	strings.write_string(&b, "{\n")
-	fmt.sbprintf(&b, "  \"frame_id\": \"%s\",\n", frame_id)
-	fmt.sbprintf(&b, "  \"project\": \"%s\",\n", json_escape(entry.project))
-	fmt.sbprintf(&b, "  \"start_time\": \"%s\",\n", entry.start_time)
-	fmt.sbprintf(&b, "  \"stop_time\": \"%s\",\n", entry.stop_time)
-	fmt.sbprintf(&b, "  \"tags\": [")
+	tags: []string
 	if len(entry.tags) > 0 {
 		parts := strings.split(entry.tags, ",", context.temp_allocator)
-		for p, i in parts {
-			if i > 0 do fmt.sbprintf(&b, ", ")
-			fmt.sbprintf(&b, "\"%s\"", strings.trim_space(p))
-		}
+		for &p in parts do p = strings.trim_space(p)
+		tags = parts
 	}
-	fmt.sbprintf(&b, "]\n}\n")
-	return strings.to_string(b)
+	j := EditFrameJson {
+		frame_id   = frame_id,
+		project    = entry.project,
+		start_time = entry.start_time,
+		stop_time  = entry.stop_time,
+		tags       = tags,
+	}
+	opt := json.Marshal_Options {
+		pretty = true,
+	}
+	data, err := json.marshal(j, opt, context.temp_allocator)
+	if err != nil do return "{}"
+	return string(data)
 }
 
-// Minimal JSON field extractor — only handles the flat frame format we write above.
-// Returns allocated strings; caller must free.
 parse_edit_json :: proc(
 	src: string,
 ) -> (
@@ -112,54 +121,27 @@ parse_edit_json :: proc(
 	ok: bool,
 ) {
 	tags = make([dynamic]string)
-
-	extract_string :: proc(src, key: string) -> (val: string, found: bool) {
-		needle := fmt.tprintf("\"%s\":", key)
-		idx := strings.index(src, needle)
-		if idx < 0 do return "", false
-		rest := src[idx + len(needle):]
-		rest = strings.trim_space(rest)
-		if len(rest) == 0 || rest[0] != '"' do return "", false
-		rest = rest[1:]
-		end := strings.index(rest, "\"")
-		if end < 0 do return "", false
-		return strings.clone(rest[:end]), true
+	ef: EditFrameJson
+	if err := json.unmarshal(transmute([]byte)src, &ef); err != nil {
+		delete(tags)
+		return "", "", "", tags, false
 	}
-
-	p, p_ok := extract_string(src, "project")
-	if !p_ok {delete(tags); return "", "", "", tags, false}
-	project = p
-
-	s, _ := extract_string(src, "start_time")
-	start_time = s
-
-	st, _ := extract_string(src, "stop_time")
-	stop_time = st
-
-	// Parse tags array: find ["a", "b", ...]
-	tags_key := "\"tags\":"
-	ti := strings.index(src, tags_key)
-	if ti >= 0 {
-		rest := strings.trim_space(src[ti + len(tags_key):])
-		if len(rest) > 0 && rest[0] == '[' {
-			rest = rest[1:]
-			end_bracket := strings.index(rest, "]")
-			if end_bracket >= 0 {
-				inner := rest[:end_bracket]
-				for len(inner) > 0 {
-					inner = strings.trim_space(inner)
-					if len(inner) == 0 || inner[0] != '"' do break
-					inner = inner[1:]
-					end := strings.index(inner, "\"")
-					if end < 0 do break
-					tag := strings.trim_space(inner[:end])
-					if len(tag) > 0 do append(&tags, strings.clone(tag))
-					inner = inner[end + 1:]
-					inner = strings.trim_left(inner, " \t\n\r,")
-				}
-			}
-		}
+	defer {
+		delete(ef.frame_id)
+		delete(ef.start_time)
+		delete(ef.stop_time)
+		delete(ef.project)
+		for t in ef.tags do delete(t)
+		delete(ef.tags)
 	}
-
-	return project, start_time, stop_time, tags, true
+	if len(ef.project) == 0 {
+		delete(tags)
+		return "", "", "", tags, false
+	}
+	for t in ef.tags do append(&tags, strings.clone(t))
+	return strings.clone(ef.project),
+		strings.clone(ef.start_time),
+		strings.clone(ef.stop_time),
+		tags,
+		true
 }
