@@ -264,6 +264,21 @@ main :: proc() {
 		}
 		fmt.printf("Updated frame %s\n", args[2])
 
+	case "import":
+		if len(args) < 3 {
+			fmt.eprintln("Usage: wotin import <path-to-watson-frames>")
+			fmt.eprintln("Default Watson path: ~/.config/watson/frames")
+			os.exit(1)
+		}
+		path := args[2]
+		imported, skipped, ok := import_watson_frames(path)
+		if !ok {
+			os.exit(1)
+		}
+		fmt.printf("Imported %d entries", imported)
+		if skipped > 0 do fmt.printf(", skipped %d", skipped)
+		fmt.println()
+
 	case "help", "--help", "-h":
 		print_help()
 		
@@ -579,6 +594,8 @@ Management:
   rename project|tag <old> <new>             Rename a project or tag everywhere
   add <project> --from <t> --to <t>          Manually add a past activity
     [+tag...] [--tags tag1,tag2]
+  import <path>                              Import from Watson frames file
+                                             (default: ~/.config/watson/frames)
 
 Time formats: HH:MM  or  YYYY-MM-DD HH:MM
 

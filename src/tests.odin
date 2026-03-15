@@ -121,7 +121,63 @@ test_parse_project_flag :: proc(t: ^testing.T) {
 	testing.expect_value(t, parsed.tags[0], "newtag")
 }
 
-// --- parse_edit_json tests ---
+// --- import_watson tests ---
+
+@(test)
+test_unix_to_sqlite :: proc(t: ^testing.T) {
+	// date -d @1730373346 --utc => 2024-10-31 11:15:46
+	result := unix_to_sqlite(1730373346)
+	testing.expect_value(t, result, "2024-10-31 11:15:46")
+	delete(result)
+}
+
+@(test)
+test_iso8601_to_sqlite :: proc(t: ^testing.T) {
+	result := iso8601_to_sqlite("2025-10-31T12:15:46Z")
+	testing.expect_value(t, result, "2025-10-31 12:15:46")
+	delete(result)
+}
+
+@(test)
+test_parse_watson_frame_array_basic :: proc(t: ^testing.T) {
+	// parse_watson_frame_array expects pos to point at the opening [ of the frame
+	src := `["myproject", 1730373346, 1730377200, ["backend", "api"], "abc1234"]`
+	end, project, start, stop, tags, ok := parse_watson_frame_array(src, 0)
+	defer { delete(project); for tag in tags do delete(tag); delete(tags) }
+
+	testing.expect(t, ok)
+	testing.expect_value(t, project, "myproject")
+	testing.expect_value(t, start, i64(1730373346))
+	testing.expect_value(t, stop,  i64(1730377200))
+	testing.expect_value(t, len(tags), 2)
+	testing.expect_value(t, tags[0], "backend")
+	_ = end
+}
+
+@(test)
+test_parse_watson_frame_array_no_tags :: proc(t: ^testing.T) {
+	src := `["proj", 1730373346, 1730377200, [], "abc"]`
+	_, project, _, _, tags, ok := parse_watson_frame_array(src, 0)
+	defer { delete(project); for tag in tags do delete(tag); delete(tags) }
+
+	testing.expect(t, ok)
+	testing.expect_value(t, len(tags), 0)
+}
+
+@(test)
+test_parse_watson_frame_object_basic :: proc(t: ^testing.T) {
+	src := `[{"project":"api-backend","started_at":"2025-10-31T12:15:46Z","stopped_at":"2025-10-31T16:09:46Z","tags":["coding"]}]`
+	end, project, start, stop, tags, ok := parse_watson_frame_object(src, 0)
+	defer { delete(project); delete(start); delete(stop); for tag in tags do delete(tag); delete(tags) }
+
+	testing.expect(t, ok)
+	testing.expect_value(t, project, "api-backend")
+	testing.expect_value(t, start, "2025-10-31 12:15:46")
+	testing.expect_value(t, stop,  "2025-10-31 16:09:46")
+	testing.expect_value(t, len(tags), 1)
+	testing.expect_value(t, tags[0], "coding")
+	_ = end
+}
 
 @(test)
 test_parse_edit_json_full :: proc(t: ^testing.T) {
