@@ -704,7 +704,6 @@ get_report_data :: proc(from_sql: string = "", to_sql: string = "", allocator :=
 	return results
 }
 
-
 // Rename a project or tag across all entries
 rename_project :: proc(old_name: string, new_name: string) -> bool {
 	upd := "UPDATE projects SET name = ? WHERE name = ?"
@@ -741,6 +740,37 @@ rename_tag :: proc(old_name: string, new_name: string) -> bool {
 	}
 	return sqlite3_changes(db) > 0
 }
+
+// Update start_time and/or stop_time of an entry by frame_id
+edit_entry_times :: proc(frame_id: string, new_start: string, new_stop: string) -> bool {
+	if len(new_start) == 0 && len(new_stop) == 0 {
+		return false
+	}
+
+	query: string
+	if len(new_start) > 0 && len(new_stop) > 0 {
+		query = fmt.tprintf("UPDATE time_entries SET start_time = '%s', stop_time = '%s' WHERE frame_id = '%s'",
+			new_start, new_stop, frame_id)
+	} else if len(new_start) > 0 {
+		query = fmt.tprintf("UPDATE time_entries SET start_time = '%s' WHERE frame_id = '%s'",
+			new_start, frame_id)
+	} else {
+		query = fmt.tprintf("UPDATE time_entries SET stop_time = '%s' WHERE frame_id = '%s'",
+			new_stop, frame_id)
+	}
+
+	query_cstr := strings.clone_to_cstring(query, context.temp_allocator)
+	stmt: ^Sqlite3_Stmt
+	if sqlite3_prepare_v2(db, query_cstr, -1, &stmt, nil) != SQLITE_OK {
+		return false
+	}
+	defer sqlite3_finalize(stmt)
+	if sqlite3_step(stmt) != SQLITE_DONE {
+		return false
+	}
+	return sqlite3_changes(db) > 0
+}
+
 format_duration :: proc(seconds: i64) -> string {
 	hours := seconds / 3600
 	mins := (seconds % 3600) / 60

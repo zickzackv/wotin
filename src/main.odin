@@ -226,7 +226,6 @@ main :: proc() {
 		}
 		format_tags(tags)
 
-
 	case "rename":
 		// wotin rename project <old> <new>
 		// wotin rename tag <old> <new>
@@ -252,6 +251,44 @@ main :: proc() {
 			}
 		case:
 			fmt.fprintf(os.stderr, "Error: unknown type '%s', use 'project' or 'tag'\n", kind)
+			os.exit(1)
+		}
+
+	case "edit":
+		// wotin edit <frame_id> [--from HH:MM] [--to HH:MM]
+		if len(args) < 3 {
+			fmt.eprintln("Usage: wotin edit <frame_id> [--from <time>] [--to <time>]")
+			os.exit(1)
+		}
+		frame_id := args[2]
+		parsed := parse_watson_args(args[3:])
+		defer free_parsed_args(&parsed)
+
+		new_start, new_stop := "", ""
+		if from_str, ok := parsed.flags["from"]; ok {
+			t, t_ok := parse_datetime(from_str)
+			if !t_ok {
+				fmt.eprintln("Error: invalid --from time format")
+				os.exit(1)
+			}
+			new_start = t
+		}
+		if to_str, ok := parsed.flags["to"]; ok {
+			t, t_ok := parse_datetime(to_str)
+			if !t_ok {
+				fmt.eprintln("Error: invalid --to time format")
+				os.exit(1)
+			}
+			new_stop = t
+		}
+		if len(new_start) == 0 && len(new_stop) == 0 {
+			fmt.eprintln("Error: specify --from and/or --to")
+			os.exit(1)
+		}
+		if edit_entry_times(frame_id, new_start, new_stop) {
+			fmt.printf("Updated frame %s\n", frame_id)
+		} else {
+			fmt.fprintf(os.stderr, "Error: frame '%s' not found\n", frame_id)
 			os.exit(1)
 		}
 
