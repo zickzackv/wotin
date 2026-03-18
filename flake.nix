@@ -17,7 +17,7 @@
     in {
       default = pkgs.stdenv.mkDerivation {
         pname = "wotin";
-        version = "0.1.0";
+        version = "0.1.1";
         src = ./src;
 
         nativeBuildInputs = [pkgs.odin];
@@ -40,6 +40,7 @@
         buildInputs = with pkgs; [odin sqlite watson];
         shellHook = ''
           export LD_LIBRARY_PATH="${pkgs.sqlite.out}/lib:$LD_LIBRARY_PATH"
+          export WOTIN_DB="$PWD/.wotin-dev.db"
         '';
       };
     });
