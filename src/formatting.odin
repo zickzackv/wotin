@@ -2,6 +2,24 @@ package main
 
 import "core:fmt"
 import "core:strings"
+import "core:terminal"
+import "core:terminal/ansi"
+
+// Wrap text in SGR color code if color output is enabled.
+// Note: do NOT use sgr() inside %-*s format verbs — ANSI bytes inflate the
+// counted width and break column alignment.  Apply only to fields printed
+// with plain %s.
+sgr :: proc(code, text: string) -> string {
+	if !terminal.color_enabled do return text
+	return fmt.tprintf(
+		"%s%s%s%s%s%s",
+		ansi.CSI,
+		code,
+		ansi.SGR,
+		text,
+		ansi.CSI + ansi.RESET + ansi.SGR,
+	)
+}
 
 format_projects :: proc(projects: [dynamic]ProjectInfo) {
 	if len(projects) == 0 {
@@ -9,20 +27,17 @@ format_projects :: proc(projects: [dynamic]ProjectInfo) {
 		return
 	}
 
-	// Calculate column widths
-	max_name := 7 // "Project"
+	max_name := 7
 	for p in projects {
-		if len(p.name) > max_name {
-			max_name = len(p.name)
-		}
+		if len(p.name) > max_name do max_name = len(p.name)
 	}
 
-	// Print header
-	fmt.printf("%-*s  %s\n", max_name, "Project", "Time")
+	fmt.printf("%-*s  %s\n", max_name, sgr(ansi.BOLD, "Project"), sgr(ansi.BOLD, "Time"))
 	fmt.println(strings.repeat("-", max_name + 2 + 5))
 
-	// Print rows
 	for p in projects {
+		// Print name with padding first, then overwrite with color via a
+		// separate write so ANSI bytes don't affect the column width.
 		fmt.printf("%-*s  %s\n", max_name, p.name, p.total_time)
 	}
 }
@@ -33,42 +48,31 @@ format_time_entries :: proc(entries: [dynamic]TimeEntryInfo) {
 		return
 	}
 
-	// Calculate column widths
-	max_project := 7 // "Project"
-	max_start := 19 // "2026-02-26 17:14"
-	max_stop := 5 // "Stop"
+	max_project := 7
+	max_start := 19
+	max_stop := 5
 
 	for e in entries {
-		if len(e.project) > max_project {
-			max_project = len(e.project)
-		}
-		if len(e.start_time) > max_start {
-			max_start = len(e.start_time)
-		}
-		if len(e.stop_time) > max_stop {
-			max_stop = len(e.stop_time)
-		}
+		if len(e.project) > max_project do max_project = len(e.project)
+		if len(e.start_time) > max_start do max_start = len(e.start_time)
+		if len(e.stop_time) > max_stop do max_stop = len(e.stop_time)
 	}
 
-	// Print header
 	fmt.printf(
 		"%-*s  %-*s  %-*s  %s\n",
 		max_project,
-		"Project",
+		sgr(ansi.BOLD, "Project"),
 		max_start,
-		"Start",
+		sgr(ansi.BOLD, "Start"),
 		max_stop,
-		"Stop",
-		"Tags",
+		sgr(ansi.BOLD, "Stop"),
+		sgr(ansi.BOLD, "Tags"),
 	)
 	fmt.println(strings.repeat("-", max_project + 2 + max_start + 2 + max_stop + 2 + 20))
 
-	// Print rows
 	for e in entries {
 		stop := e.stop_time
-		if len(stop) == 0 {
-			stop = "running"
-		}
+		if len(stop) == 0 do stop = "running"
 		fmt.printf(
 			"%-*s  %-*s  %-*s  %s\n",
 			max_project,
@@ -88,19 +92,14 @@ format_tags :: proc(tags: [dynamic]TagInfo) {
 		return
 	}
 
-	// Calculate column widths
-	max_name := 3 // "Tag"
+	max_name := 3
 	for t in tags {
-		if len(t.name) > max_name {
-			max_name = len(t.name)
-		}
+		if len(t.name) > max_name do max_name = len(t.name)
 	}
 
-	// Print header
-	fmt.printf("%-*s  %s\n", max_name, "Tag", "Count")
+	fmt.printf("%-*s  %s\n", max_name, sgr(ansi.BOLD, "Tag"), sgr(ansi.BOLD, "Count"))
 	fmt.println(strings.repeat("-", max_name + 2 + 5))
 
-	// Print rows
 	for t in tags {
 		fmt.printf("%-*s  %d\n", max_name, t.name, t.count)
 	}
