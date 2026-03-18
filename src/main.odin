@@ -9,6 +9,8 @@ import "core:terminal/ansi"
 main :: proc() {
 	args := os.args[1:]
 
+	load_config()
+
 	// Strip global --db <path> flag before subcommand dispatch
 	if len(args) >= 2 && args[0] == "--db" {
 		os.set_env("WOTIN_DB", args[1])
