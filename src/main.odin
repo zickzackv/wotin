@@ -647,6 +647,7 @@ Management:
     [+tag...] [--tags tag1,tag2]
   import <path>                              Import from Watson frames file
                                              (default: ~/.config/watson/frames)
+  completion bash|zsh|fish                  Print shell completion script
 
 Time formats: HH:MM  or  YYYY-MM-DD HH:MM
 
