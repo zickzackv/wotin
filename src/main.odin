@@ -3,6 +3,8 @@ package main
 import "core:fmt"
 import "core:os"
 import "core:strings"
+import "core:terminal"
+import "core:terminal/ansi"
 
 main :: proc() {
 	args := os.args[1:]
@@ -38,11 +40,11 @@ main :: proc() {
 			delete(entry.tags)
 			delete(frame_id)
 		}
-		fmt.printf("Project %s", entry.project)
+		fmt.printf("Project %s", sgr(ansi.FG_GREEN, entry.project))
 		if len(entry.tags) > 0 {
-			fmt.printf(" [%s]", entry.tags)
+			fmt.printf(" [%s]", sgr(ansi.FG_CYAN, entry.tags))
 		}
-		fmt.printf(" started at %s (frame: %s)\n", entry.start_time, frame_id)
+		fmt.printf(" started at %s (frame: %s)\n", entry.start_time, sgr(ansi.FAINT, frame_id))
 
 	case "cancel":
 		if cancel_current_entry() {
@@ -267,6 +269,9 @@ main :: proc() {
 		if skipped > 0 do fmt.printf(", skipped %d", skipped)
 		fmt.println()
 
+	case "version", "--version":
+		fmt.printf("wotin %s\n", WOTIN_VERSION)
+
 	case "help", "--help", "-h":
 		print_help()
 
@@ -287,6 +292,17 @@ main :: proc() {
 		}
 
 		project := parsed.positional[0]
+
+		// Resolve optional --at time
+		at_time := ""
+		if at_str, has_at := parsed.flags["at"]; has_at {
+			parsed_at, at_ok := parse_datetime(at_str)
+			if !at_ok {
+				fmt.eprintln("Error: invalid --at time format, use HH:MM or YYYY-MM-DD HH:MM")
+				os.exit(1)
+			}
+			at_time = parsed_at
+		}
 
 		// Auto-stop current activity if running
 		current, frame_id, is_running := get_current_entry()
@@ -309,7 +325,7 @@ main :: proc() {
 			}
 		}
 
-		if start_tracking(project, parsed.tags[:]) {
+		if start_tracking(project, parsed.tags[:], at_time) {
 			fmt.printf("Started: %s", project)
 			if len(parsed.tags) > 0 {
 				fmt.printf(" [")
@@ -379,24 +395,26 @@ main :: proc() {
 
 		if _, has_json := parsed.flags["json"]; has_json {
 			fmt.println(format_entries_json(entries[:]))
+		} else if _, has_csv := parsed.flags["csv"]; has_csv {
+			format_entries_csv(entries[:])
 		} else {
 			current_date := ""
 			for entry in entries {
 				date := entry.start_time[:10] if len(entry.start_time) >= 10 else ""
 				if date != current_date {
 					if current_date != "" do fmt.println()
-					fmt.printf("%s\n", date)
+					fmt.printf("%s\n", sgr(ansi.BOLD, date))
 					current_date = date
 				}
 				start_time :=
 					entry.start_time[11:16] if len(entry.start_time) >= 16 else entry.start_time
 				stop_time := entry.stop_time[11:16] if len(entry.stop_time) >= 16 else "running"
-				fmt.printf("  %s to %-8s  %s", start_time, stop_time, entry.project)
+				fmt.printf("  %s to %-8s  %s", start_time, stop_time, sgr(ansi.FG_GREEN, entry.project))
 				if len(entry.tags) > 0 {
-					fmt.printf(" [%s]", entry.tags)
+					fmt.printf(" [%s]", sgr(ansi.FG_CYAN, entry.tags))
 				}
 				if len(entry.frame_id) > 0 {
-					fmt.printf("  (%s)", entry.frame_id)
+					fmt.printf("  (%s)", sgr(ansi.FAINT, entry.frame_id))
 				}
 				fmt.println()
 			}
@@ -427,16 +445,18 @@ main :: proc() {
 				)
 			}
 			fmt.println("]}")
+		} else if _, has_csv := parsed.flags["csv"]; has_csv {
+			format_report_csv(reports[:])
 		} else {
 			total_seconds: i64 = 0
 			for report in reports {
 				if report.total_seconds == 0 do continue
-				fmt.printf("%s", report.project)
+				fmt.printf("%s", sgr(ansi.FG_GREEN, report.project))
 				padding := 50 - len(report.project)
 				for i := 0; i < padding; i += 1 do fmt.print(".")
 				fmt.printf(" %s\n", format_duration(report.total_seconds))
 				for tag, seconds in report.tag_times {
-					fmt.printf("    [%s]", tag)
+					fmt.printf("    [%s]", sgr(ansi.FG_CYAN, tag))
 					tag_padding := 42 - len(tag)
 					for i := 0; i < tag_padding; i += 1 do fmt.print(".")
 					fmt.printf(" %s\n", format_duration(seconds))
@@ -444,7 +464,7 @@ main :: proc() {
 				total_seconds += report.total_seconds
 			}
 			fmt.println()
-			fmt.printf("Total")
+			fmt.printf("%s", sgr(ansi.BOLD, "Total"))
 			for i := 0; i < 45; i += 1 do fmt.print(".")
 			fmt.printf(" %s\n", format_duration(total_seconds))
 		}
