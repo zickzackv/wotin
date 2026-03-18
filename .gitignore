@@ -27,3 +27,7 @@ ols.json
 
 # test data
 test_frames.json
+
+# dev database and nix result symlink
+*.db
+result
