@@ -247,3 +247,67 @@ test_frame_to_edit_json_roundtrip :: proc(t: ^testing.T) {
 	testing.expect_value(t, stop, "2026-03-15 09:00:00")
 	testing.expect_value(t, len(tags), 2)
 }
+
+// --- JSON formatter tests ---
+
+@(test)
+test_format_report_json_empty :: proc(t: ^testing.T) {
+	result := format_report_json([]ProjectReport{})
+	testing.expect_value(t, result, `{"projects":[]}`)
+}
+
+@(test)
+test_format_report_json_single :: proc(t: ^testing.T) {
+	tag_times := make(map[string]i64, allocator = context.temp_allocator)
+	reports := []ProjectReport{{project = "myproject", total_seconds = 3600, tag_times = tag_times}}
+	result := format_report_json(reports)
+	testing.expect_value(t, result, `{"projects":[{"name":"myproject","seconds":3600}]}`)
+}
+
+@(test)
+test_format_report_json_multiple :: proc(t: ^testing.T) {
+	tag_times := make(map[string]i64, allocator = context.temp_allocator)
+	reports := []ProjectReport{
+		{project = "a", total_seconds = 100, tag_times = tag_times},
+		{project = "b", total_seconds = 200, tag_times = tag_times},
+	}
+	result := format_report_json(reports)
+	testing.expect_value(
+		t,
+		result,
+		`{"projects":[{"name":"a","seconds":100},{"name":"b","seconds":200}]}`,
+	)
+}
+
+@(test)
+test_format_report_json_special_chars :: proc(t: ^testing.T) {
+	// project name with quotes/braces should be properly escaped
+	tag_times := make(map[string]i64, allocator = context.temp_allocator)
+	reports := []ProjectReport{
+		{project = `say "hello"`, total_seconds = 42, tag_times = tag_times},
+	}
+	result := format_report_json(reports)
+	testing.expect_value(
+		t,
+		result,
+		`{"projects":[{"name":"say \"hello\"","seconds":42}]}`,
+	)
+}
+
+@(test)
+test_format_entries_json_empty :: proc(t: ^testing.T) {
+	result := format_entries_json([]TimeEntryInfo{})
+	testing.expect_value(t, result, "[]")
+}
+
+@(test)
+test_format_entries_json_single :: proc(t: ^testing.T) {
+	entries := []TimeEntryInfo{
+		{project = "proj", start_time = "2026-03-15 09:00:00", stop_time = "2026-03-15 10:00:00"},
+	}
+	result := format_entries_json(entries)
+	// must be valid JSON array containing the entry
+	testing.expect(t, strings.contains(result, `"project":"proj"`), "expected project field")
+	testing.expect(t, strings.has_prefix(result, "["), "expected array start")
+	testing.expect(t, strings.has_suffix(result, "]"), "expected array end")
+}

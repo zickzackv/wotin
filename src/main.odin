@@ -437,16 +437,8 @@ main :: proc() {
 		}
 
 		if _, has_json := parsed.flags["json"]; has_json {
-			fmt.print("{\"projects\":[")
-			for report, i in reports {
-				if i > 0 do fmt.print(",")
-				fmt.printf(
-					"{\"name\":\"%s\",\"seconds\":%d}",
-					report.project,
-					report.total_seconds,
-				)
-			}
-			fmt.println("]}")
+			fmt.print(format_report_json(reports[:]))
+			fmt.println()
 		} else if _, has_csv := parsed.flags["csv"]; has_csv {
 			format_report_csv(reports[:])
 		} else {

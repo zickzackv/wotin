@@ -43,3 +43,19 @@ format_entries_json :: proc(entries: []TimeEntryInfo) -> string {
 	strings.write_byte(&b, ']')
 	return strings.to_string(b)
 }
+
+format_report_json :: proc(reports: []ProjectReport) -> string {
+	b := strings.builder_make(context.temp_allocator)
+	strings.write_string(&b, `{"projects":[`)
+	for r, i in reports {
+		if i > 0 do strings.write_byte(&b, ',')
+		strings.write_string(&b, `{"name":`)
+		data, _ := json.marshal(r.project, allocator = context.temp_allocator)
+		strings.write_string(&b, string(data))
+		strings.write_string(&b, `,"seconds":`)
+		strings.write_i64(&b, r.total_seconds)
+		strings.write_byte(&b, '}')
+	}
+	strings.write_string(&b, "]}")
+	return strings.to_string(b)
+}
