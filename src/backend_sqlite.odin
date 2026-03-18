@@ -219,7 +219,7 @@ get_or_create_tag :: proc(name: string) -> (id: i64, ok: bool) {
 }
 
 
-start_tracking :: proc(project: string, tags: []string) -> bool {
+start_tracking :: proc(project: string, tags: []string, at_time: string = "") -> bool {
 	// Check for existing running entry
 	check_sql := "SELECT id FROM time_entries WHERE stop_time IS NULL"
 	check_sql_cstr := strings.clone_to_cstring(check_sql, context.temp_allocator)
@@ -245,7 +245,16 @@ start_tracking :: proc(project: string, tags: []string) -> bool {
 	frame_id := generate_frame_id(project, "")
 
 	// Insert time entry with frame_id
-	insert_sql := "INSERT INTO time_entries (project_id, start_time, frame_id) VALUES (?, strftime('%Y-%m-%d %H:%M:%S', 'now'), ?)"
+	insert_sql: string
+	if len(at_time) > 0 {
+		insert_sql = fmt.tprintf(
+			"INSERT INTO time_entries (project_id, start_time, frame_id) VALUES (?, '%s', ?)",
+			at_time,
+		)
+	} else {
+		insert_sql =
+			"INSERT INTO time_entries (project_id, start_time, frame_id) VALUES (?, strftime('%Y-%m-%d %H:%M:%S', 'now'), ?)"
+	}
 	insert_sql_cstr := strings.clone_to_cstring(insert_sql, context.temp_allocator)
 
 	stmt2: ^Sqlite3_Stmt
