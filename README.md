@@ -56,6 +56,7 @@ wotin cancel
 wotin start <project> [+tag1 +tag2...] [--at HH:MM]
 wotin start myproject +backend +api
 wotin start "client work" +meeting --tags urgent,important
+wotin start myproject +backend --at 09:00   # backdate to 09:00 today
 ```
 - Automatically stops any running activity
 - Supports both `+tag` and `--tags` syntax
@@ -120,6 +121,16 @@ wotin list tags
 **add** - Manually add past activity (old syntax)
 ```bash
 wotin add <project> --from <time> --to <time> [--tags tag1,tag2]
+```
+
+**import** - Import from Watson frames file
+```bash
+wotin import ~/.config/watson/frames
+```
+
+**version** - Show version
+```bash
+wotin version
 ```
 
 ## Database
@@ -231,38 +242,28 @@ src/
 
 ## Implementation Status
 
-**Completed (12/20 tasks - 60%)**:
+**Complete (23/23 tasks — 100%)**:
 - ✅ Frame ID support
 - ✅ Watson-style argument parser
 - ✅ Time shortcuts (--today, --week, etc.)
-- ✅ status, cancel, frames commands
-- ✅ Enhanced start/stop with auto-stop
-- ✅ log and report commands
+- ✅ status, cancel, restart, frames commands
+- ✅ Enhanced start/stop with auto-stop and --at flag
+- ✅ log and report commands with time filters
+- ✅ aggregate command (daily breakdown)
+- ✅ projects and tags listing
+- ✅ remove, change, edit, rename commands
+- ✅ current command (alias for status)
 - ✅ JSON output formatter
-
-**Remaining**:
-- ⏳ restart/continue command
-- ⏳ remove, change, edit commands
-- ⏳ rename command (bulk updates)
-- ⏳ aggregate command (daily breakdown)
-- ⏳ Enhanced projects/tags listing
-- ⏳ current command (alias for status)
-- ⏳ Comprehensive help system
+- ✅ Colored terminal output (respects NO_COLOR)
+- ✅ Comprehensive help system
+- ✅ Watson frames import
+- ✅ version subcommand
 
 ## Future Enhancements
 
-Planned features (not yet implemented):
-- Time filtering (--from, --to with shortcuts)
-- Frame editing via text editor
-- Bulk rename operations
-- Daily aggregation reports
-- CSV export
-- Shell completion scripts (bash, zsh, fish)
-- Configuration file support
-- Colored output in all commands
-- Per-subcommand help (`-h` / `--help` on each subcommand)
-- Better error messages when subcommands are called with wrong arguments
-- `version` subcommand (`wotin version` / `wotin --version`)
+- ✅ CSV export (`wotin log --csv`, `wotin report --csv`)
+- ✅ Shell completion scripts (`wotin completion bash|zsh|fish`)
+- ✅ Configuration file (`~/.config/wotin/config`)
 
 ## Contributing
 
