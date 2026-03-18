@@ -12,7 +12,7 @@ import "core:terminal/ansi"
 sgr :: proc(code, text: string) -> string {
 	if !terminal.color_enabled do return text
 	return fmt.tprintf(
-		"%s%s%s%s%s%s",
+		"%s%s%s%s%s",
 		ansi.CSI,
 		code,
 		ansi.SGR,
