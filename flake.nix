@@ -20,15 +20,17 @@
         version = "0.1.1";
         src = ./src;
 
-        nativeBuildInputs = [pkgs.odin];
+        nativeBuildInputs = [pkgs.odin pkgs.scdoc];
         buildInputs = [pkgs.sqlite];
 
         buildPhase = ''
           odin build . -out:wotin -o:speed
+          scdoc < ../docs/wotin.1.scd > wotin.1
         '';
 
         installPhase = ''
           install -Dm755 wotin $out/bin/wotin
+          install -Dm644 wotin.1 $out/share/man/man1/wotin.1
         '';
       };
     });
