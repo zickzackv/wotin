@@ -596,6 +596,13 @@ main :: proc() {
 			os.exit(1)
 		}
 
+	case "completion":
+		if len(args) < 2 {
+			fmt.eprintln("Usage: wotin completion bash|zsh|fish")
+			os.exit(1)
+		}
+		print_completion(args[1])
+
 	case:
 		fmt.fprintf(os.stderr, "Unknown command: '%s'\n", args[0])
 		fmt.eprintln("Run 'wotin help' for usage.")
