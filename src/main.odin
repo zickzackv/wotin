@@ -230,7 +230,7 @@ main :: proc() {
 			if rename_project(old_name, new_name) {
 				fmt.printf("Renamed project '%s' -> '%s'\n", old_name, new_name)
 			} else {
-				fmt.fprintf(os.stderr, "Error: project '%s' not found\n", old_name)
+				fmt.fprintf(os.stderr, "Error: project '%s' could not be renamed\n", old_name)
 				os.exit(1)
 			}
 		case "tag":

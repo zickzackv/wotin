@@ -389,8 +389,7 @@ list_time_entries :: proc(
 	allocator := context.allocator,
 ) -> [dynamic]TimeEntryInfo {
 	results := make([dynamic]TimeEntryInfo, allocator)
-	base :=
-	  `SELECT
+	base := `SELECT
   	  COALESCE(te.frame_id,''),
       p.name,
       te.start_time,
@@ -406,6 +405,7 @@ list_time_entries :: proc(
     JOIN projects p ON te.project_id = p.id
     LEFT JOIN time_entry_tags tet ON te.id = tet.time_entry_id
     LEFT JOIN tags t ON tet.tag_id = t.id`
+
 
 	query: string
 	if len(from_sql) > 0 && len(to_sql) > 0 {
@@ -782,23 +782,59 @@ get_report_data :: proc(
 	return results
 }
 
+project_name_exists :: proc(name: string) -> bool {
+	query := strings.clone_to_cstring(
+		`SELECT * from projects WHERE name = ?`,
+		context.temp_allocator,
+	)
+	stmt : ^Sqlite3_Stmt
+	if sqlite3_prepare_v2(db, query, -1, &stmt, nil) != SQLITE_OK {
+		fmt.eprintln(
+			"SQL Error: Preparing SQL statement failed",
+		)
+		return false
+	}
+  defer sqlite3_finalize(stmt)
+  new_name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+  sqlite3_bind_text(stmt, 1, new_name_cstr, -1, nil)
+  if sqlite3_step(stmt) != SQLITE_ROW{
+    return false
+  } else {
+    return true
+  }
+
+	return false
+}
+
 // Rename a project or tag across all entries
 rename_project :: proc(old_name: string, new_name: string) -> bool {
-	upd := "UPDATE projects SET name = ? WHERE name = ?"
-	upd_cstr := strings.clone_to_cstring(upd, context.temp_allocator)
-	stmt: ^Sqlite3_Stmt
-	if sqlite3_prepare_v2(db, upd_cstr, -1, &stmt, nil) != SQLITE_OK {
+	if project_name_exists(new_name) {
+		fmt.eprintln(
+			"No Yet Implemented: Renaming a Project into an existing one means reassigning already existing time entries",
+		)
 		return false
+	} else {
+		upd := "UPDATE projects SET name = ? WHERE name = ?"
+		upd_cstr := strings.clone_to_cstring(upd, context.temp_allocator)
+		stmt: ^Sqlite3_Stmt
+		if sqlite3_prepare_v2(db, upd_cstr, -1, &stmt, nil) != SQLITE_OK {
+			return false
+		}
+		defer sqlite3_finalize(stmt)
+		new_cstr := strings.clone_to_cstring(new_name, context.temp_allocator)
+		old_cstr := strings.clone_to_cstring(old_name, context.temp_allocator)
+		sqlite3_bind_text(stmt, 1, new_cstr, -1, nil)
+		sqlite3_bind_text(stmt, 2, old_cstr, -1, nil)
+		result := sqlite3_step(stmt) == SQLITE_DONE
+		changes := sqlite3_changes(db)
+
+		if !result {
+			fmt.eprintln("Step error:", sqlite3_errmsg(db))
+		}
+		fmt.println("Updated", changes, "projects")
+		return result && changes > 0
 	}
-	defer sqlite3_finalize(stmt)
-	new_cstr := strings.clone_to_cstring(new_name, context.temp_allocator)
-	old_cstr := strings.clone_to_cstring(old_name, context.temp_allocator)
-	sqlite3_bind_text(stmt, 1, new_cstr, -1, nil)
-	sqlite3_bind_text(stmt, 2, old_cstr, -1, nil)
-	if sqlite3_step(stmt) != SQLITE_DONE {
-		return false
-	}
-	return sqlite3_changes(db) > 0
+
 }
 
 rename_tag :: proc(old_name: string, new_name: string) -> bool {
