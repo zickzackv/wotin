@@ -3,7 +3,6 @@ package main
 import "core:fmt"
 import "core:os"
 import "core:strings"
-import "core:terminal"
 import "core:terminal/ansi"
 
 main :: proc() {
@@ -411,7 +410,14 @@ main :: proc() {
 				start_time :=
 					entry.start_time[11:16] if len(entry.start_time) >= 16 else entry.start_time
 				stop_time := entry.stop_time[11:16] if len(entry.stop_time) >= 16 else "running"
-				fmt.printf("  %s to %-8s  %s", start_time, stop_time, sgr(ansi.FG_GREEN, entry.project))
+				duration := entry.duration
+				fmt.printf(
+					"  %s to %-8s  %s  %s",
+					start_time,
+					stop_time,
+					sgr(ansi.FG_YELLOW, duration),
+					sgr(ansi.FG_GREEN, entry.project),
+				)
 				if len(entry.tags) > 0 {
 					fmt.printf(" [%s]", sgr(ansi.FG_CYAN, entry.tags))
 				}
@@ -660,3 +666,4 @@ Examples:
 `,
 	)
 }
+

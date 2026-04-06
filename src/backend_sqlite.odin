@@ -252,8 +252,7 @@ start_tracking :: proc(project: string, tags: []string, at_time: string = "") ->
 			at_time,
 		)
 	} else {
-		insert_sql =
-			"INSERT INTO time_entries (project_id, start_time, frame_id) VALUES (?, strftime('%Y-%m-%d %H:%M:%S', 'now'), ?)"
+		insert_sql = "INSERT INTO time_entries (project_id, start_time, frame_id) VALUES (?, strftime('%Y-%m-%d %H:%M:%S', 'now'), ?)"
 	}
 	insert_sql_cstr := strings.clone_to_cstring(insert_sql, context.temp_allocator)
 
@@ -348,6 +347,7 @@ TimeEntryInfo :: struct {
 	project:    string,
 	start_time: string,
 	stop_time:  string,
+	duration:   string,
 	tags:       string,
 }
 
@@ -389,8 +389,24 @@ list_time_entries :: proc(
 	allocator := context.allocator,
 ) -> [dynamic]TimeEntryInfo {
 	results := make([dynamic]TimeEntryInfo, allocator)
+	base :=
+	  `SELECT
+  	  COALESCE(te.frame_id,''),
+      p.name,
+      te.start_time,
+      COALESCE(te.stop_time, ''),
+      printf(
+        '%03dh %02dm %02ds',
+        CAST((strftime('%s', COALESCE(te.stop_time, datetime('now'))) - strftime('%s', te.start_time)) / 3600 AS INTEGER),
+        CAST(((strftime('%s', COALESCE(te.stop_time, datetime('now'))) - strftime('%s', te.start_time)) % 3600) / 60 AS INTEGER),
+        CAST((strftime('%s', COALESCE(te.stop_time, datetime('now'))) - strftime('%s', te.start_time)) % 60 AS INTEGER)
+      ),
+      GROUP_CONCAT(t.name, ',')
+	  FROM time_entries te
+    JOIN projects p ON te.project_id = p.id
+    LEFT JOIN time_entry_tags tet ON te.id = tet.time_entry_id
+    LEFT JOIN tags t ON tet.tag_id = t.id`
 
-	base := "SELECT COALESCE(te.frame_id,''), p.name, te.start_time, COALESCE(te.stop_time, ''), GROUP_CONCAT(t.name, ',') FROM time_entries te JOIN projects p ON te.project_id = p.id LEFT JOIN time_entry_tags tet ON te.id = tet.time_entry_id LEFT JOIN tags t ON tet.tag_id = t.id"
 	query: string
 	if len(from_sql) > 0 && len(to_sql) > 0 {
 		query = fmt.tprintf(
@@ -415,7 +431,8 @@ list_time_entries :: proc(
 		project := string(cstring(sqlite3_column_text(stmt, 1)))
 		start_time := string(cstring(sqlite3_column_text(stmt, 2)))
 		stop_time := string(cstring(sqlite3_column_text(stmt, 3)))
-		tags_ptr := sqlite3_column_text(stmt, 4)
+		duration := string(cstring(sqlite3_column_text(stmt, 4)))
+		tags_ptr := sqlite3_column_text(stmt, 5)
 		tags := ""
 		if tags_ptr != nil {
 			tags = string(cstring(tags_ptr))
@@ -428,6 +445,7 @@ list_time_entries :: proc(
 				project = strings.clone(project, allocator),
 				start_time = strings.clone(start_time, allocator),
 				stop_time = strings.clone(stop_time, allocator),
+				duration = strings.clone(duration, allocator),
 				tags = strings.clone(tags, allocator),
 			},
 		)
@@ -1036,3 +1054,4 @@ get_aggregate_data :: proc(
 	}
 	return results
 }
+
